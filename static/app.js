@@ -19,6 +19,31 @@
     not_available: "Not available",
   };
 
+  // Simple hand-drawn outline icons, styled in CSS as a colored circle with
+  // a white stroke glyph — echoes the AEP site's four quick-link icons.
+  const ICON_PATHS = {
+    warning: '<polygon points="12,3 2,20 22,20"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="12" y1="17" x2="12" y2="17.01"/>',
+    info: '<circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12" y2="8.01"/>',
+    check: '<circle cx="12" cy="12" r="9"/><polyline points="8,12 11,15 16,9"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><polyline points="12,7 12,12 16,14"/>',
+    bell: '<path d="M6 10a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+    shield: '<path d="M12 3 4 6v6c0 5 4 8 8 9 4-1 8-4 8-9V6l-8-3z"/>',
+    checklist: '<rect x="4" y="4" width="16" height="16" rx="2"/><polyline points="8,12 10,14 15,9"/>',
+    list: '<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+  };
+
+  function iconCircle(kind, color, small) {
+    const span = document.createElement("span");
+    span.className = "icon-circle" + (small ? " icon-circle-sm" : "");
+    span.style.background = color;
+    span.setAttribute("aria-hidden", "true");
+    span.innerHTML = `<svg viewBox="0 0 24 24">${ICON_PATHS[kind]}</svg>`;
+    return span;
+  }
+
+  const RISK_ICON = { Low: "check", Moderate: "info", High: "warning" };
+  const RISK_COLOR_VAR = { Low: "--color-risk-low", Moderate: "--color-risk-moderate", High: "--color-risk-high" };
+
   function applyStoredTheme() {
     try {
       const stored = localStorage.getItem("wattsnext-theme");
@@ -104,10 +129,9 @@
     const chipRow = document.createElement("div");
     const chip = document.createElement("span");
     chip.className = "risk-chip risk-" + risk.risk_band.value;
-    const dot = document.createElement("span");
-    dot.className = "dot";
-    chip.appendChild(dot);
-    chip.appendChild(document.createTextNode(risk.risk_band.value + " risk"));
+    const band = risk.risk_band.value;
+    chip.appendChild(iconCircle(RISK_ICON[band] || "info", `var(${RISK_COLOR_VAR[band] || "--color-risk-moderate"})`, true));
+    chip.appendChild(document.createTextNode(band + " risk"));
     chipRow.appendChild(chip);
     appendChild(chipRow, evidenceTag(risk.risk_band));
     const conf = document.createElement("span");
@@ -146,13 +170,21 @@
     return wrap;
   }
 
+  function laneHeading(text, iconKind, iconColor) {
+    const h4 = document.createElement("h4");
+    h4.className = "section-title";
+    h4.appendChild(iconCircle(iconKind, iconColor, true));
+    h4.appendChild(document.createTextNode(text));
+    return h4;
+  }
+
   function threeLaneCard(restoration, prep) {
     const card = document.createElement("div");
     card.className = "card lanes";
 
     const estimateLane = document.createElement("div");
     estimateLane.className = "lane";
-    estimateLane.innerHTML = "<h4>Estimate</h4>";
+    estimateLane.appendChild(laneHeading("Estimate", "clock", "var(--color-icon-blue)"));
     if (restoration && !restoration.fallback.fallback) {
       if (restoration.reference_effort_hours.value === 0) {
         const p = document.createElement("p");
@@ -166,18 +198,25 @@
         estimateLane.appendChild(tagRow);
       }
     } else {
-      estimateLane.innerHTML += '<p class="empty-lane">No estimate available.</p>';
+      const p = document.createElement("p");
+      p.className = "empty-lane";
+      p.textContent = "No estimate available.";
+      estimateLane.appendChild(p);
     }
     card.appendChild(estimateLane);
 
     const confirmedLane = document.createElement("div");
     confirmedLane.className = "lane";
-    confirmedLane.innerHTML = "<h4>Confirmed by utility</h4><p class=\"empty-lane\">Nothing is confirmed by the utility in this prototype.</p>";
+    confirmedLane.appendChild(laneHeading("Confirmed by utility", "shield", "var(--color-icon-teal)"));
+    const confirmedEmpty = document.createElement("p");
+    confirmedEmpty.className = "empty-lane";
+    confirmedEmpty.textContent = "Nothing is confirmed by the utility in this prototype.";
+    confirmedLane.appendChild(confirmedEmpty);
     card.appendChild(confirmedLane);
 
     const actionsLane = document.createElement("div");
     actionsLane.className = "lane";
-    actionsLane.innerHTML = "<h4>What you can do</h4>";
+    actionsLane.appendChild(laneHeading("What you can do", "checklist", "var(--color-icon-green)"));
     const actions = (prep && prep.actions) || [];
     if (actions.length) {
       const ul = document.createElement("ul");
@@ -205,6 +244,7 @@
       card.textContent = alerts.fallback.reason;
       return card;
     }
+    card.appendChild(laneHeading("Alerts", "bell", "var(--color-icon-orange)"));
     const header = document.createElement("p");
     header.innerHTML = alerts.eligible
       ? `<strong>Eligible for alerts</strong> via ${alerts.channel}.`
@@ -427,11 +467,13 @@
     return event.type;
   }
 
-  function dashboardSection(title) {
+  function dashboardSection(title, iconKind, iconColor) {
     const section = document.createElement("div");
     section.className = "dashboard-section";
     const h3 = document.createElement("h3");
-    h3.textContent = title;
+    h3.className = "section-title";
+    if (iconKind) h3.appendChild(iconCircle(iconKind, iconColor, true));
+    h3.appendChild(document.createTextNode(title));
     section.appendChild(h3);
     return section;
   }
@@ -450,11 +492,11 @@
     const grid = document.createElement("div");
     grid.className = "dashboard-grid";
 
-    const riskSection = dashboardSection("Risk");
+    const riskSection = dashboardSection("Risk", "warning", "var(--color-icon-orange)");
     riskSection.appendChild(riskCard(data.risk));
     grid.appendChild(riskSection);
 
-    const estimateSection = dashboardSection("Restoration estimate");
+    const estimateSection = dashboardSection("Restoration estimate", "clock", "var(--color-icon-blue)");
     if (data.restoration.reference_effort_hours.value === 0) {
       const p = document.createElement("p");
       p.textContent = "Power should be back on per this simulation.";
@@ -475,7 +517,7 @@
     grid.appendChild(estimateSection);
     root.appendChild(grid);
 
-    const timelineSection = dashboardSection("Restoration step timeline");
+    const timelineSection = dashboardSection("Restoration step timeline", "list", "var(--color-icon-teal)");
     const jobs = (data.timeline && data.timeline.jobs) || [];
     if (!jobs.length) {
       const p = document.createElement("p");
@@ -502,7 +544,7 @@
     }
     root.appendChild(timelineSection);
 
-    const alertsSection = dashboardSection("Alert messages");
+    const alertsSection = dashboardSection("Alert messages", "bell", "var(--color-icon-orange)");
     for (const alert of data.alerts) {
       const row = document.createElement("div");
       row.className = "alert-row";
@@ -530,7 +572,7 @@
     }
     root.appendChild(alertsSection);
 
-    const eventsSection = dashboardSection("Session event feed");
+    const eventsSection = dashboardSection("Session event feed", "clock", "var(--color-icon-teal)");
     if (!data.events.length) {
       const p = document.createElement("p");
       p.className = "empty-lane";

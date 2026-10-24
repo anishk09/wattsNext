@@ -1,28 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap');
 
 :root {
-  /* AEP-inspired brand colors (never the AEP logo/wordmark) */
-  --color-primary: #1B365D;      /* deep navy — primary buttons, links, headers */
+  /* AEP-site-inspired brand colors (never the AEP/Ohio Power logo or wordmark) */
+  --color-primary: #D2352B;      /* red — primary buttons, active states, thin rule */
   --color-on-primary: #FFFFFF;
-  --color-accent: #29A8DF;       /* bright blue — secondary accents, active states */
-  --color-on-accent: #0B1E33;
-  --color-highlight: #F5B335;    /* gold — sparing highlight */
-  --color-on-highlight: #1B365D;
-  --color-destructive: #D7262E;  /* thin red accent — used sparingly */
-  --color-background: #F8FAFC;
-  --color-panel: #E8F1F8;        /* pale blue — dashboard panels */
-  --color-foreground: #1E293B;
+  --color-accent: #1F5FA8;       /* blue — secondary accent */
+  --color-on-accent: #FFFFFF;
+  --color-highlight: #B35A12;    /* darkened from the screenshot's #E07A1F orange icon so white-on-fill clears AA; see DESIGN.md */
+  --color-on-highlight: #FFFFFF;
+  --color-destructive: #7A1620;  /* dark maroon — safety warnings, kept well clear of brand red */
+  --color-background: #FFFFFF;
+  --color-panel: #F2F2F2;        /* light gray — dashboard panels */
+  --color-foreground: #2E2E2E;   /* charcoal */
   --color-card: #FFFFFF;
-  --color-card-foreground: #1E293B;
-  --color-muted: #E8F1F8;
-  --color-muted-foreground: #475569;
-  --color-border: #D7E3EE;
-  --color-ring: #1B365D;
+  --color-card-foreground: #2E2E2E;
+  --color-muted: #F2F2F2;
+  --color-muted-foreground: #5A5A5A;
+  --color-border: #D9D9D9;
+  --color-ring: #D2352B;
+  --color-link: #D2352B;         /* brand red passes AA as text on white; dark mode needs a lighter tint (see below) */
 
-  /* Risk colors stay a distinct hue family from the brand palette above */
-  --color-risk-low: #15803D;
-  --color-risk-moderate: #C2410C;
-  --color-risk-high: #B91C1C;
+  /* Icon-circle fills (white glyph on top) — contrast-checked white-on-fill, so these
+     stay constant across light/dark; darkened from the screenshot's lighter swatches
+     where needed (orange, teal) to clear 4.5:1. See DESIGN.md. */
+  --color-icon-blue: #1F5FA8;
+  --color-icon-orange: #B35A12;
+  --color-icon-teal: #0E6B7A;
+  --color-icon-green: #3F7A1E;
+
+  /* Risk colors: a distinct hue family from brand red, always paired with an icon + label */
+  --color-risk-high: #7A1620;    /* dark maroon, not the brand red */
+  --color-risk-moderate: #B35A12;
+  --color-risk-low: #3F7A1E;
 
   --space-1: 8px;
   --space-2: 16px;
@@ -33,57 +42,59 @@
   --radius-card: 10px;
   --radius-pill: 4px;
 
-  --font-heading: 'Lexend', system-ui, sans-serif;
-  --font-body: 'Source Sans 3', system-ui, sans-serif;
+  --font-heading: 'Barlow Condensed', system-ui, sans-serif;
+  --font-body: 'Barlow', system-ui, sans-serif;
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-primary: #29A8DF;
-    --color-on-primary: #0B1E33;
-    --color-accent: #29A8DF;
-    --color-on-accent: #0B1E33;
-    --color-highlight: #F5B335;
-    --color-on-highlight: #F5B335;
-    --color-destructive: #F87171;
-    --color-background: #0F172A;
-    --color-panel: #16314F;
-    --color-foreground: #E2E8F0;
-    --color-card: #1E293B;
-    --color-card-foreground: #E2E8F0;
-    --color-muted: #16314F;
-    --color-muted-foreground: #94A3B8;
-    --color-border: #2B4A6B;
-    --color-ring: #29A8DF;
-    --color-risk-low: #4ADE80;
-    --color-risk-moderate: #FB923C;
-    --color-risk-high: #F87171;
+    --color-primary: #D2352B;
+    --color-on-primary: #FFFFFF;
+    --color-accent: #4A8FD4;
+    --color-on-accent: #0D1A26;
+    --color-highlight: #E0975A;
+    --color-on-highlight: #26150A;
+    --color-destructive: #E8A0A6;
+    --color-background: #1C1C1C;
+    --color-panel: #262626;
+    --color-foreground: #F2F2F2;
+    --color-card: #2E2E2E;
+    --color-card-foreground: #F2F2F2;
+    --color-muted: #3A3A3A;
+    --color-muted-foreground: #B5B5B5;
+    --color-border: #454545;
+    --color-ring: #D2352B;
+    --color-link: #E8626B;
+    --color-risk-high: #E8A0A6;
+    --color-risk-moderate: #F2994A;
+    --color-risk-low: #7FC24A;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --color-primary: #29A8DF;
-  --color-on-primary: #0B1E33;
-  --color-accent: #29A8DF;
-  --color-on-accent: #0B1E33;
-  --color-highlight: #F5B335;
-  --color-on-highlight: #F5B335;
-  --color-destructive: #F87171;
-  --color-background: #0F172A;
-  --color-panel: #16314F;
-  --color-foreground: #E2E8F0;
-  --color-card: #1E293B;
-  --color-card-foreground: #E2E8F0;
-  --color-muted: #16314F;
-  --color-muted-foreground: #94A3B8;
-  --color-border: #2B4A6B;
-  --color-ring: #29A8DF;
-  --color-risk-low: #4ADE80;
-  --color-risk-moderate: #FB923C;
-  --color-risk-high: #F87171;
+  --color-primary: #D2352B;
+  --color-on-primary: #FFFFFF;
+  --color-accent: #4A8FD4;
+  --color-on-accent: #0D1A26;
+  --color-highlight: #E0975A;
+  --color-on-highlight: #26150A;
+  --color-destructive: #E8A0A6;
+  --color-background: #1C1C1C;
+  --color-panel: #262626;
+  --color-foreground: #F2F2F2;
+  --color-card: #2E2E2E;
+  --color-card-foreground: #F2F2F2;
+  --color-muted: #3A3A3A;
+  --color-muted-foreground: #B5B5B5;
+  --color-border: #454545;
+  --color-ring: #D2352B;
+  --color-link: #E8626B;
+  --color-risk-high: #E8A0A6;
+  --color-risk-moderate: #F2994A;
+  --color-risk-low: #7FC24A;
   color-scheme: dark;
 }
 
@@ -114,6 +125,21 @@ body {
 
 h1, h2, h3, button, .label { font-family: var(--font-heading); }
 
+h1, h2, h3, h4 {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Short action labels read like the screenshot's nav/CTA buttons; long
+   question/chip text stays sentence case so it's still easy to read. */
+.composer button, #new-conversation-btn, .view-toggle button,
+#settings-save, #settings-close, #evidence-close, .icon-btn {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+}
+
 button {
   cursor: pointer;
   font-size: 15px;
@@ -134,7 +160,7 @@ button:active { transform: scale(0.98); }
   outline-offset: 2px;
 }
 
-a { color: var(--color-primary); }
+a { color: var(--color-link); }
 
 .app {
   max-width: 760px;
@@ -149,7 +175,7 @@ a { color: var(--color-primary); }
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-2) var(--space-2) var(--space-1);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 3px solid var(--color-primary);
 }
 
 .topbar .brand {
@@ -292,13 +318,9 @@ a { color: var(--color-primary); }
   font-size: 14px;
 }
 
-.risk-chip .dot { width: 10px; height: 10px; border-radius: 50%; }
 .risk-Low { background: color-mix(in srgb, var(--color-risk-low) 15%, transparent); color: var(--color-risk-low); }
-.risk-Low .dot { background: var(--color-risk-low); }
 .risk-Moderate { background: color-mix(in srgb, var(--color-risk-moderate) 18%, transparent); color: var(--color-risk-moderate); }
-.risk-Moderate .dot { background: var(--color-risk-moderate); }
 .risk-High { background: color-mix(in srgb, var(--color-risk-high) 15%, transparent); color: var(--color-risk-high); }
-.risk-High .dot { background: var(--color-risk-high); }
 
 .confidence-label {
   font-size: 13px;
@@ -558,7 +580,7 @@ dialog .evidence-kind {
 }
 
 .status-pending { background: var(--color-muted); color: var(--color-muted-foreground); }
-.status-in_progress { background: color-mix(in srgb, var(--color-highlight) 30%, transparent); color: var(--color-on-highlight); }
+.status-in_progress { background: color-mix(in srgb, var(--color-highlight) 30%, transparent); color: var(--color-highlight); }
 .status-complete { background: color-mix(in srgb, var(--color-risk-low) 18%, transparent); color: var(--color-risk-low); }
 
 .alert-row {
@@ -596,6 +618,31 @@ dialog .evidence-kind {
 
 .event-row:last-child { border-bottom: none; }
 .event-row time { color: var(--color-muted-foreground); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
+/* Simple colored outline icons in circles, like the AEP site's four quick links */
+.icon-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-circle svg { width: 18px; height: 18px; stroke: #FFFFFF; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.icon-circle-sm { width: 22px; height: 22px; }
+.icon-circle-sm svg { width: 13px; height: 13px; stroke-width: 2.2; }
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.risk-chip .icon-circle { width: 22px; height: 22px; }
+.risk-chip .icon-circle svg { width: 13px; height: 13px; }
 
 /* Placed last so it wins over the unconditional rules above at this width */
 @media (max-width: 480px) {
