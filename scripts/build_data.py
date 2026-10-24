@@ -108,6 +108,103 @@ def _circuit_city_map():
     return circuit_map
 
 
+def _device_status_lookup():
+    """location_n -> normal_sta, for the three device tables that carry it."""
+    lookup = {}
+    for path in [
+        AEP / "data" / "extracted" / "Data2" / "Recloser_Bank_Clip.dbf",
+        AEP / "data" / "extracted" / "Data1" / "Fuse_Bank_Clip.dbf",
+        AEP / "data" / "extracted" / "Data2" / "Switch_Clip.dbf",
+    ]:
+        _, records = read_dbf(path)
+        for r in records:
+            if r.get("location_n"):
+                lookup[r["location_n"]] = r.get("normal_sta")
+    return lookup
+
+
+def _parse_upstream_line(line):
+    """One matched_upstream.txt line: premise_num, then tab-separated hops
+    household-transformer -> ... -> circuit breaker, each
+    eo_<source>*<id>*<description>*<location_code>."""
+    parts = line.rstrip("\n").split("\t")
+    premise_num = parts[0]
+    hops = []
+    for hop in parts[1:]:
+        fields = hop.split("*")
+        if len(fields) != 4:
+            continue
+        source, dev_id, description, location = fields
+        hops.append({"source": source, "id": dev_id, "description": description, "location": location})
+    return premise_num, hops
+
+
+def build_upstream_chains(cases, device_status, ambiguous_pairs):
+    """
+    For each case, find one real premise on its circuit and extract its
+    ordered upstream device chain (closest to the household first), each
+    hop annotated with the device's real normal_sta where known (the
+    transformer and the final circuit breaker aren't in those three
+    tables, so their status is "unknown" — never guessed as Closed).
+
+    Target circuit_id: the case's own circuit_id when the historical-risk
+    join trusts it; for an ambiguous circuit (risk_status != "ok") we
+    still want a representative chain for the step-restoration demo, so
+    we accept either of the ambiguous candidate circuit_ids — a different,
+    looser join than the risk model's, used only for topology shape, never
+    for the damage-rate statistics.
+    """
+    target_ids_by_case = {}
+    for case in cases:
+        if case.get("circuit_id"):
+            target_ids_by_case[case["case_id"]] = {case["circuit_id"]}
+        elif case.get("risk_status") == "ambiguous_circuit_label":
+            amb = next(
+                (a for a in ambiguous_pairs if a["station"] == case["substation"] and a["circuit"] == case["circuit"]),
+                None,
+            )
+            target_ids_by_case[case["case_id"]] = set(amb["circuit_ids"]) if amb else set()
+        else:
+            target_ids_by_case[case["case_id"]] = set()
+
+    found = {}
+    path = AEP / "data" / "extracted" / "matched_upstream" / "matched_upstream.txt"
+    with open(path, encoding="latin-1") as f:
+        for line in f:
+            if len(found) == len(target_ids_by_case):
+                break
+            premise_num, hops = _parse_upstream_line(line)
+            if not hops:
+                continue
+            last = hops[-1]
+            if last["source"] != "eo_circuit":
+                continue
+            circuit_id = last["location"]  # eo_circuit's "location" field is actually the numeric circuit_id
+            for case_id, target_ids in target_ids_by_case.items():
+                if case_id in found or not target_ids:
+                    continue
+                if circuit_id in target_ids:
+                    found[case_id] = hops
+
+    for case in cases:
+        hops = found.get(case["case_id"])
+        if not hops:
+            case["upstream_chain"] = None
+            continue
+        chain = []
+        for hop in hops:
+            status = "unknown"
+            if hop["source"] == "eo_isolating_eqpt_inst":
+                status = device_status.get(hop["location"], "unknown")
+            chain.append({
+                "source": hop["source"],
+                "description": hop["description"],
+                "normal_status": status,
+            })
+        case["upstream_chain"] = chain
+    return cases
+
+
 def _risk_join_status(crosswalk, ambiguous, station, circuit):
     """Whether this case's (station, circuit) can be trusted for the
     population-level historical risk model — independent of whether its
@@ -339,6 +436,9 @@ def main():
     (OUT / "labor_reference.json").write_text(json.dumps(labor, indent=2))
 
     cases = build_cases() + [build_no_path_case()]
+    _, ambiguous_pairs = build_circuit_crosswalk()
+    device_status = _device_status_lookup()
+    cases = build_upstream_chains(cases, device_status, ambiguous_pairs)
     (OUT / "cases.json").write_text(json.dumps(cases, indent=2))
 
     households = build_households()

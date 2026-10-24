@@ -213,6 +213,17 @@
         appendChild(tagRow, evidenceTag(restoration.low_hours, "low"));
         appendChild(tagRow, evidenceTag(restoration.high_hours, "high"));
         estimateLane.appendChild(tagRow);
+        if (restoration.nearest_closed_device) {
+          const stepRow = document.createElement("p");
+          stepRow.style.fontSize = "13px";
+          stepRow.style.color = "var(--color-muted-foreground)";
+          stepRow.appendChild(document.createTextNode("Nearest upstream device: " + restoration.nearest_closed_device.value + " "));
+          appendChild(stepRow, evidenceTag(restoration.nearest_closed_device));
+          if (restoration.upstream_damage_items.length) {
+            stepRow.appendChild(document.createTextNode(" (" + restoration.upstream_damage_items.length + " repair(s) beyond it don't affect this household)"));
+          }
+          estimateLane.appendChild(stepRow);
+        }
       }
     } else {
       const p = document.createElement("p");

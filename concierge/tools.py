@@ -62,6 +62,14 @@ def get_restoration_estimate(household_id, access_blocked=False, extra_crews=0, 
         case, access_blocked=access_blocked, extra_crews=extra_crews, repairs_complete=repairs_complete
     )
     conf = engine.confidence(case, access_blocked=access_blocked, repairs_complete=repairs_complete)
+    phases = engine.restoration_phases(case)
+
+    def _item_tag(d):
+        return {
+            "asset_type": _tag(d["asset_type"], SOURCE_DATA),
+            "quantity": _tag(d["quantity"], ASSUMPTION, "quantity assigned to this household is a replay assumption"),
+            "repaired": _tag(d.get("repaired", True), SOURCE_DATA),
+        }
 
     return {
         "fallback": {"fallback": False, "reason": None},
@@ -70,14 +78,14 @@ def get_restoration_estimate(household_id, access_blocked=False, extra_crews=0, 
         "reference_effort_hours": _tag(estimate["reference_effort_hours"], MODEL_ESTIMATE),
         "access_blocked": _tag(access_blocked, ASSUMPTION, "+3 h assumed delay when access is blocked"),
         "crew_count": _tag(estimate["crew_count"], ASSUMPTION, "baseline 1 crew; chip adds crews"),
-        "damage_items": [
-            {
-                "asset_type": _tag(d["asset_type"], SOURCE_DATA),
-                "quantity": _tag(d["quantity"], ASSUMPTION, "quantity assigned to this household is a replay assumption"),
-                "repaired": _tag(d.get("repaired", True), SOURCE_DATA),
-            }
-            for d in case["damage_items"]
-        ],
+        "damage_items": [_item_tag(d) for d in phases["local"]],
+        "upstream_damage_items": [_item_tag(d) for d in phases["upstream"]],
+        "nearest_closed_device": _tag(
+            phases["nearest_closed_device"], SOURCE_DATA,
+            "The nearest normally-closed protective device on this household's real upstream path "
+            "(matched_upstream.txt) — only damage between the household and this device affects its "
+            "restoration time. Damage beyond it is isolated by this device, step restoration.",
+        ) if phases["nearest_closed_device"] else None,
         "confidence": _tag(conf["level"], MODEL_ESTIMATE, conf["reason"]),
         "confirmed_by_utility": _tag(None, NOT_AVAILABLE, "Nothing in this prototype is confirmed by the utility."),
     }

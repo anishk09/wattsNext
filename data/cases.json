@@ -21,7 +21,44 @@
     ],
     "source_note": "Unrepaired transformer damage on STATION24/CIR114 in the ARCOS damage extract (arcos_prod_damage_09_28_Clip). 25 kVA is the modal transformer size on this circuit.",
     "circuit_id": "0000114",
-    "risk_status": "ok"
+    "risk_status": "ok",
+    "upstream_chain": [
+      {
+        "source": "eo_power_xfrmr_inst",
+        "description": "Distribution",
+        "normal_status": "unknown"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Fuse",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Fuse",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Recloser (Electronic)",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Recloser (Electronic)",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Recloser (Electronic)",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_circuit",
+        "description": "Circuit Breaker",
+        "normal_status": "unknown"
+      }
+    ]
   },
   {
     "case_id": "wirepole_vinton",
@@ -50,7 +87,39 @@
     ],
     "source_note": "Unrepaired primary-wire and pole damage on STATION29/CIR6 in the ARCOS damage extract.",
     "circuit_id": null,
-    "risk_status": "ambiguous_circuit_label"
+    "risk_status": "ambiguous_circuit_label",
+    "upstream_chain": [
+      {
+        "source": "eo_power_xfrmr_inst",
+        "description": "Distribution",
+        "normal_status": "unknown"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Fuse",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Recloser (Hydraulic)",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Recloser (Electronic)",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Recloser (Electronic)",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_circuit",
+        "description": "Circuit Breaker",
+        "normal_status": "unknown"
+      }
+    ]
   },
   {
     "case_id": "wire_montvale",
@@ -72,7 +141,39 @@
     ],
     "source_note": "Unrepaired primary-wire damage on STATION2/CIR60 in the ARCOS damage extract.",
     "circuit_id": "0000060",
-    "risk_status": "ok"
+    "risk_status": "ok",
+    "upstream_chain": [
+      {
+        "source": "eo_power_xfrmr_inst",
+        "description": "Distribution",
+        "normal_status": "unknown"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Fuse",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Recloser (Hydraulic)",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Recloser (Hydraulic)",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Recloser (Hydraulic)",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_circuit",
+        "description": "Circuit Breaker",
+        "normal_status": "unknown"
+      }
+    ]
   },
   {
     "case_id": "calm_roanoke",
@@ -87,7 +188,29 @@
     "damage_items": [],
     "source_note": "STATION10/CIR95 has zero damage records in the ARCOS extract \u2014 included deliberately alongside the Roanoke transformer case to show risk follows the upstream path, not the city name.",
     "circuit_id": "0000095",
-    "risk_status": "ok"
+    "risk_status": "ok",
+    "upstream_chain": [
+      {
+        "source": "eo_power_xfrmr_inst",
+        "description": "Distribution",
+        "normal_status": "unknown"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Fuse",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_isolating_eqpt_inst",
+        "description": "Fuse",
+        "normal_status": "Closed"
+      },
+      {
+        "source": "eo_circuit",
+        "description": "Circuit Breaker",
+        "normal_status": "unknown"
+      }
+    ]
   },
   {
     "case_id": "no_path",
@@ -102,6 +225,7 @@
     ],
     "path_valid": false,
     "damage_items": [],
-    "source_note": "Synthetic consistency-check failure: this household's premise does not resolve to a complete upstream chain in matched_upstream.txt. Used to exercise the cannot-predict fallback."
+    "source_note": "Synthetic consistency-check failure: this household's premise does not resolve to a complete upstream chain in matched_upstream.txt. Used to exercise the cannot-predict fallback.",
+    "upstream_chain": null
   }
 ]

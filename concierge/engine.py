@@ -31,6 +31,59 @@ RISK_FALLBACK_REASONS = {
     "no_path": "This household has no validated upstream path.",
 }
 
+# Damage asset types that correspond to an actual protective device hop in
+# the upstream chain (matched against that hop's free-text "description").
+# Everything else (primary/secondary/pole/...) has no finer position in the
+# source data than "this circuit," so it's conservatively assumed local to
+# the household — a stated assumption, not a measurement.
+DEVICE_DESCRIPTION_BY_ASSET_TYPE = {
+    "fuse_bank": "Fuse",
+    "recloser_bank": "Recloser",
+    "switch": "Switch",
+}
+
+
+def nearest_closed_device_index(chain):
+    """Index into the upstream chain of the first normally-closed protective
+    device (skips the household's own transformer at index 0). None if the
+    chain is unavailable or has no closed device — never guessed."""
+    if not chain:
+        return None
+    for i, hop in enumerate(chain):
+        if hop["source"] == "eo_isolating_eqpt_inst" and hop["normal_status"] == "Closed":
+            return i
+    return None
+
+
+def restoration_phases(case):
+    """
+    Splits a case's damage_items into what actually blocks THIS household —
+    its own transformer, plus anything between it and the nearest normally
+    closed upstream protective device — versus damage further upstream that
+    device isolates: crews still have to fix it, but it doesn't extend this
+    household's restoration time ("step restoration").
+    """
+    chain = case.get("upstream_chain")
+    upstream_device_descriptions = set()
+    idx = nearest_closed_device_index(chain) if chain else None
+    if idx is not None:
+        upstream_device_descriptions = {
+            hop["description"] for hop in chain[idx + 1:] if hop["source"] == "eo_isolating_eqpt_inst"
+        }
+
+    local, upstream = [], []
+    for item in case["damage_items"]:
+        device_label = DEVICE_DESCRIPTION_BY_ASSET_TYPE.get(item["asset_type"])
+        is_upstream = device_label is not None and any(device_label in d for d in upstream_device_descriptions)
+        (upstream if is_upstream else local).append(item)
+
+    return {
+        "local": local,
+        "upstream": upstream,
+        "chain_available": chain is not None,
+        "nearest_closed_device": chain[idx]["description"] if idx is not None else None,
+    }
+
 
 def _unit_hours(item):
     cat = CATEGORIES[item["asset_type"]]
@@ -80,7 +133,7 @@ def job_timeline(case, crew_count=1, repairs_complete=False):
     The first job scheduled on each crew is 'in_progress' (it's the one the
     crew would be on right now in this replay); later jobs on that crew are
     'pending'. This comes straight from the scheduler, not a fabricated clock."""
-    jobs = _jobs(case["damage_items"])
+    jobs = _jobs(restoration_phases(case)["local"])
     crews = _schedule(jobs, crew_count)
     timeline = []
     for crew_index, crew_jobs in enumerate(crews, start=1):
@@ -119,7 +172,7 @@ def restoration_effort(case, access_blocked=False, extra_crews=0, repairs_comple
             "crew_count": 1 + extra_crews,
         }
 
-    jobs = _jobs(case["damage_items"])
+    jobs = _jobs(restoration_phases(case)["local"])
     crew_count = 1 + extra_crews
     reference_effort = _makespan(jobs, crew_count)
 
