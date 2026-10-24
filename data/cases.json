@@ -19,7 +19,9 @@
         "repaired": false
       }
     ],
-    "source_note": "Unrepaired transformer damage on STATION24/CIR114 in the ARCOS damage extract (arcos_prod_damage_09_28_Clip). 25 kVA is the modal transformer size on this circuit."
+    "source_note": "Unrepaired transformer damage on STATION24/CIR114 in the ARCOS damage extract (arcos_prod_damage_09_28_Clip). 25 kVA is the modal transformer size on this circuit.",
+    "circuit_id": "0000114",
+    "risk_status": "ok"
   },
   {
     "case_id": "wirepole_vinton",
@@ -46,7 +48,9 @@
         "repaired": false
       }
     ],
-    "source_note": "Unrepaired primary-wire and pole damage on STATION29/CIR6 in the ARCOS damage extract."
+    "source_note": "Unrepaired primary-wire and pole damage on STATION29/CIR6 in the ARCOS damage extract.",
+    "circuit_id": null,
+    "risk_status": "ambiguous_circuit_label"
   },
   {
     "case_id": "wire_montvale",
@@ -66,7 +70,9 @@
         "repaired": false
       }
     ],
-    "source_note": "Unrepaired primary-wire damage on STATION2/CIR60 in the ARCOS damage extract."
+    "source_note": "Unrepaired primary-wire damage on STATION2/CIR60 in the ARCOS damage extract.",
+    "circuit_id": "0000060",
+    "risk_status": "ok"
   },
   {
     "case_id": "calm_roanoke",
@@ -79,7 +85,9 @@
     ],
     "path_valid": true,
     "damage_items": [],
-    "source_note": "STATION10/CIR95 has zero damage records in the ARCOS extract \u2014 included deliberately alongside the Roanoke transformer case to show risk follows the upstream path, not the city name."
+    "source_note": "STATION10/CIR95 has zero damage records in the ARCOS extract \u2014 included deliberately alongside the Roanoke transformer case to show risk follows the upstream path, not the city name.",
+    "circuit_id": "0000095",
+    "risk_status": "ok"
   },
   {
     "case_id": "no_path",
@@ -87,6 +95,8 @@
     "storm_setting": "severe",
     "substation": null,
     "circuit": null,
+    "circuit_id": null,
+    "risk_status": "no_path",
     "cities": [
       "Roanoke"
     ],

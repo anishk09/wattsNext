@@ -16,6 +16,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from _dbf import read_dbf
 from _xlsx import read_xlsx
+from _circuit_join import build_circuit_crosswalk
 
 ROOT = pathlib.Path(__file__).parent.parent
 AEP = ROOT / "aep-data"
@@ -107,14 +108,33 @@ def _circuit_city_map():
     return circuit_map
 
 
+def _risk_join_status(crosswalk, ambiguous, station, circuit):
+    """Whether this case's (station, circuit) can be trusted for the
+    population-level historical risk model — independent of whether its
+    damage_items (the replay scenario) are usable. See data/data_quality.json."""
+    key = (station, circuit)
+    for a in ambiguous:
+        if (a["station"], a["circuit"]) == key:
+            return None, "ambiguous_circuit_label"
+    if key in crosswalk:
+        return crosswalk[key], "ok"
+    return None, "unmapped_circuit_label"
+
+
 def build_cases():
     """
     Four replay cases grounded in real circuits from the AEP sample package.
     Each case names a real (station, circuit) pair with its real unrepaired
     damage at extract time (2025-10-24) and the real top cities it serves.
     Household-to-case assignment is a replay assumption (see confidence rules).
+
+    circuit_id/risk_status come from the same crosswalk build_risk_model.py
+    uses — a case can have a perfectly good damage_items scenario (for the
+    restoration estimate) while its risk_status is "ambiguous" or
+    "unmapped" (the historical risk model can't trust that circuit label).
     """
-    return [
+    crosswalk, ambiguous = build_circuit_crosswalk()
+    cases = [
         {
             "case_id": "transformer_roanoke",
             "label": "Transformer damage",
@@ -173,6 +193,11 @@ def build_cases():
             ),
         },
     ]
+    for case in cases:
+        cid, status = _risk_join_status(crosswalk, ambiguous, case["substation"], case["circuit"])
+        case["circuit_id"] = cid
+        case["risk_status"] = status
+    return cases
 
 
 def build_households():
@@ -295,6 +320,8 @@ def build_no_path_case():
         "storm_setting": "severe",
         "substation": None,
         "circuit": None,
+        "circuit_id": None,
+        "risk_status": "no_path",
         "cities": ["Roanoke"],
         "path_valid": False,
         "damage_items": [],

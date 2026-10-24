@@ -88,9 +88,12 @@ def _render_offline_text(intent, cards):
     parts = []
     if "risk" in cards:
         r = cards["risk"]
-        parts.append(
-            f"Risk is {r['risk_band']['value']} ({r['confidence']['value']} confidence). {r['risk_reason']} {r['confidence']['note']}"
-        )
+        if r["fallback"]["fallback"]:
+            parts.append(f"Risk: {r['fallback']['reason']}")
+        else:
+            parts.append(
+                f"Risk is {r['risk_band']['value']} ({r['confidence']['value']} confidence). {r['risk_reason']} {r['confidence']['note']}"
+            )
     if "restoration" in cards:
         e = cards["restoration"]
         if e["reference_effort_hours"]["value"] == 0.0:

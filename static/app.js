@@ -144,6 +144,23 @@
     const reason = document.createElement("p");
     reason.textContent = risk.risk_reason;
     card.appendChild(reason);
+
+    if (risk.historical_rate) {
+      const hr = risk.historical_rate;
+      const rateRow = document.createElement("p");
+      rateRow.style.fontSize = "13px";
+      rateRow.style.color = "var(--color-muted-foreground)";
+      rateRow.appendChild(document.createTextNode("Historical rate: "));
+      rateRow.appendChild(document.createTextNode(hr.base_rate.value + " "));
+      appendChild(rateRow, evidenceTag(hr.base_rate, "circuit"));
+      rateRow.appendChild(document.createTextNode(" vs system " + hr.system_rate.value + " "));
+      appendChild(rateRow, evidenceTag(hr.system_rate, "system"));
+      if (risk.storm_multiplier) {
+        rateRow.appendChild(document.createTextNode(" × " + risk.storm_multiplier.value + " "));
+        appendChild(rateRow, evidenceTag(risk.storm_multiplier, "storm"));
+      }
+      card.appendChild(rateRow);
+    }
     return card;
   }
 

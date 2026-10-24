@@ -1,0 +1,205 @@
+{
+  "circuit_crosswalk": {
+    "method": "Union of (station, circuit, circuit_id) triples from Transformer/Primary/Secondary/Fuse Bank/Recloser Bank/Switch tables.",
+    "unique_pairs_mapped": 107,
+    "ambiguous_pairs_excluded": [
+      {
+        "station": "STATION29",
+        "circuit": "CIR6",
+        "circuit_ids": [
+          "0000005",
+          "0000006"
+        ]
+      },
+      {
+        "station": "STATION32",
+        "circuit": "CIR3",
+        "circuit_ids": [
+          "0000002",
+          "0000003"
+        ]
+      },
+      {
+        "station": "STATION9",
+        "circuit": "CIR15",
+        "circuit_ids": [
+          "0000014",
+          "0000015"
+        ]
+      },
+      {
+        "station": "STATION16",
+        "circuit": "CIR9",
+        "circuit_ids": [
+          "0000008",
+          "0000009"
+        ]
+      },
+      {
+        "station": "STATION14",
+        "circuit": "CIR8",
+        "circuit_ids": [
+          "0000007",
+          "0000008"
+        ]
+      },
+      {
+        "station": "STATION4",
+        "circuit": "CIR5",
+        "circuit_ids": [
+          "0000004",
+          "0000005"
+        ]
+      },
+      {
+        "station": "STATION5",
+        "circuit": "CIR7",
+        "circuit_ids": [
+          "0000006",
+          "0000007"
+        ]
+      },
+      {
+        "station": "STATION7",
+        "circuit": "CIR11",
+        "circuit_ids": [
+          "0000010",
+          "0000011"
+        ]
+      },
+      {
+        "station": "STATION7",
+        "circuit": "CIR16",
+        "circuit_ids": [
+          "0000015",
+          "0000016"
+        ]
+      },
+      {
+        "station": "STATION8",
+        "circuit": "CIR10",
+        "circuit_ids": [
+          "0000009",
+          "0000010"
+        ]
+      },
+      {
+        "station": "STATION23",
+        "circuit": "CIR12",
+        "circuit_ids": [
+          "0000011",
+          "0000012"
+        ]
+      },
+      {
+        "station": "STATION24",
+        "circuit": "CIR4",
+        "circuit_ids": [
+          "0000003",
+          "0000004"
+        ]
+      },
+      {
+        "station": "STATION12",
+        "circuit": "CIR14",
+        "circuit_ids": [
+          "0000013",
+          "0000014"
+        ]
+      },
+      {
+        "station": "STATION1",
+        "circuit": "CIR2",
+        "circuit_ids": [
+          "0000002",
+          "0000016"
+        ]
+      }
+    ],
+    "ambiguous_pair_count": 14
+  },
+  "damage_join": {
+    "total_damage_records": 1659,
+    "joined": 1089,
+    "unmapped": 570,
+    "unmapped_station_circuit_pairs": [
+      {
+        "station": "STATION1",
+        "circuit": "CIR2",
+        "record_count": 240
+      },
+      {
+        "station": "STATION8",
+        "circuit": "CIR10",
+        "record_count": 189
+      },
+      {
+        "station": "STATION29",
+        "circuit": "CIR6",
+        "record_count": 43
+      },
+      {
+        "station": "STATION24",
+        "circuit": "CIR4",
+        "record_count": 35
+      },
+      {
+        "station": "STATION9",
+        "circuit": "CIR15",
+        "record_count": 22
+      },
+      {
+        "station": "STATION4",
+        "circuit": "CIR5",
+        "record_count": 7
+      },
+      {
+        "station": "STATION23",
+        "circuit": "CIR12",
+        "record_count": 7
+      },
+      {
+        "station": "STATION32",
+        "circuit": "CIR3",
+        "record_count": 6
+      },
+      {
+        "station": "STATION9",
+        "circuit": "TINKER",
+        "record_count": 6
+      },
+      {
+        "station": "STATION14",
+        "circuit": "CIR8",
+        "record_count": 6
+      },
+      {
+        "station": "STATION7",
+        "circuit": "CIR16",
+        "record_count": 3
+      },
+      {
+        "station": "STATION5",
+        "circuit": "CIR7",
+        "record_count": 3
+      },
+      {
+        "station": "STATION7",
+        "circuit": "CIR11",
+        "record_count": 2
+      },
+      {
+        "station": "STATION24",
+        "circuit": "SERVICE CENTER",
+        "record_count": 1
+      }
+    ]
+  },
+  "unrepaired_with_repair_date": {
+    "count": 76,
+    "of_unrepaired_total": 76,
+    "note": "Repaired=No records all carry a non-blank Repaired_D \u2014 almost certainly the extract's snapshot date, not a real completion date. Never read for unrepaired records."
+  },
+  "near_fid_not_used": "NEAR_FID is a spatial-join artifact in the damage extract and is not used anywhere in this join.",
+  "pole_and_rare_types_no_exposure_table": "Pole, Capacitor Bank, Light, and Step Transformer damage counts toward each circuit's OVERALL rate but have no independent per-circuit exposure table, so they get no per-asset-type rate of their own."
+}

@@ -27,16 +27,26 @@ def get_risk(household_id, repairs_complete=False):
     fallback = engine.check_fallback(case)
     if fallback["fallback"]:
         return {"fallback": fallback}
+    risk_fallback = engine.check_risk_fallback(case)
+    if risk_fallback["fallback"]:
+        return {"fallback": risk_fallback}
 
     risk = engine.risk_band(case, repairs_complete=repairs_complete)
-    conf = engine.confidence(case)
+    conf = engine.confidence(case, repairs_complete=repairs_complete)
     return {
         "fallback": {"fallback": False, "reason": None},
         "city": household["city"],
-        "risk_band": _tag(risk["band"], MODEL_ESTIMATE, "demonstration rule, not a calibrated probability"),
+        "risk_band": _tag(risk["band"], risk["evidence"], "demonstration rule, not a calibrated probability"),
         "risk_reason": risk["reason"],
         "confidence": _tag(conf["level"], MODEL_ESTIMATE, conf["reason"]),
         "storm_setting": _tag(case["storm_setting"], SOURCE_DATA),
+        "storm_multiplier": _tag(risk.get("storm_multiplier"), ASSUMPTION, "Storm setting scales the historical rate as a stated assumption, not a derived value.") if "storm_multiplier" in risk else None,
+        "historical_rate": {
+            "base_rate": _tag(risk.get("base_rate"), MODEL_ESTIMATE, "Empirical-Bayes-shrunk historical damage rate for this circuit."),
+            "system_rate": _tag(risk.get("system_rate"), SOURCE_DATA, "System-wide historical damage rate across all circuits."),
+            "exposure": _tag(risk.get("exposure"), SOURCE_DATA, "Customer count on this circuit — the rate's denominator."),
+            "damage_count": _tag(risk.get("damage_count"), SOURCE_DATA, "Damage records reliably joined to this circuit."),
+        } if "base_rate" in risk else None,
         "confirmed_by_utility": _tag(None, NOT_AVAILABLE, "Nothing in this prototype is confirmed by the utility."),
     }
 
@@ -51,7 +61,7 @@ def get_restoration_estimate(household_id, access_blocked=False, extra_crews=0, 
     estimate = engine.restoration_effort(
         case, access_blocked=access_blocked, extra_crews=extra_crews, repairs_complete=repairs_complete
     )
-    conf = engine.confidence(case, access_blocked=access_blocked)
+    conf = engine.confidence(case, access_blocked=access_blocked, repairs_complete=repairs_complete)
 
     return {
         "fallback": {"fallback": False, "reason": None},
@@ -87,7 +97,15 @@ def get_prep_guidance(household_id, repairs_complete=False):
             ],
         }
 
-    risk = engine.risk_band(case, repairs_complete=repairs_complete)
+    risk_fallback = engine.check_risk_fallback(case)
+    if risk_fallback["fallback"]:
+        # Historical risk is unavailable for this circuit label (see
+        # data/data_quality.json), but prep guidance can still lean on
+        # whether a damage scenario is assigned to this path at all.
+        band = "Moderate" if case["damage_items"] else "Low"
+        risk = {"band": band}
+    else:
+        risk = engine.risk_band(case, repairs_complete=repairs_complete)
     return {"fallback": {"fallback": False, "reason": None}, "actions": customer_services.prep_guidance(household, risk)}
 
 

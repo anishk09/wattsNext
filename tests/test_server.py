@@ -32,6 +32,20 @@ class ChatFlow(unittest.TestCase):
         resp = self.client.post("/api/chat", json={"session_id": session_id, "message": "Will I lose power?"})
         self.assertTrue(resp.json()["fallback"])
 
+    def test_risk_fallback_on_ambiguous_circuit_does_not_crash_the_chat(self):
+        # h4 sits on a circuit the historical risk model can't trust
+        # (STATION29/CIR6 maps ambiguously), but path_valid is still true,
+        # so the top-level household fallback check doesn't catch it —
+        # this is the per-card fallback the offline renderer must handle.
+        resp = self.client.post("/api/session", json={"household_id": "h4"})
+        session_id = resp.json()["session_id"]
+        resp = self.client.post("/api/chat", json={"session_id": session_id, "message": "Will I lose power and for how long?"})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body["cards"]["risk"]["fallback"]["fallback"])
+        self.assertIn("ambiguous", body["text"])
+        self.assertFalse(body["cards"]["restoration"]["fallback"]["fallback"])
+
 
 class WhatIfFlow(unittest.TestCase):
     def setUp(self):

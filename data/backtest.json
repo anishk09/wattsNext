@@ -1,0 +1,11 @@
+{
+  "cutoff_date": "20250201",
+  "train_record_count": 352,
+  "test_record_count": 1307,
+  "circuits_evaluated": 110,
+  "spearman_rank_correlation": 0.391,
+  "top_decile_circuit_count": 11,
+  "top_decile_hit_rate": 0.511,
+  "top_decile_expected_by_chance": 0.1,
+  "interpretation": "Weak but positive signal (rho=0.391) \u2014 better than chance, not strong enough to lean on alone."
+}

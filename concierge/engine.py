@@ -14,6 +14,23 @@ _labor = json.loads((DATA / "labor_reference.json").read_text())
 ILM = _labor["indirect_multiplier"]
 CATEGORIES = _labor["categories"]
 
+_risk_model = json.loads((DATA / "risk_model.json").read_text())
+STORM_MULTIPLIER = _risk_model["storm_multiplier"]
+BAND_THRESHOLDS = _risk_model["overall"]["band_thresholds"]
+
+RISK_FALLBACK_REASONS = {
+    "ambiguous_circuit_label": (
+        "This circuit's damage history can't be reliably computed — source records for {station}/{circuit} "
+        "map ambiguously to more than one circuit ID in the underlying GIS asset tables, so we can't trust "
+        "a population-level rate for it."
+    ),
+    "unmapped_circuit_label": (
+        "This circuit's damage history can't be reliably computed — {station}/{circuit} doesn't appear in "
+        "any of the asset tables used to build the historical rate model."
+    ),
+    "no_path": "This household has no validated upstream path.",
+}
+
 
 def _unit_hours(item):
     cat = CATEGORIES[item["asset_type"]]
@@ -121,37 +138,94 @@ def restoration_effort(case, access_blocked=False, extra_crews=0, repairs_comple
     }
 
 
-def risk_band(case, repairs_complete=False):
-    """Demonstration rule, not a calibrated probability."""
-    if repairs_complete:
-        return {"band": "Low", "reason": "Repairs on this path are marked complete in this simulation."}
+def check_risk_fallback(case):
+    """Risk has its OWN fallback condition, separate from check_fallback():
+    a circuit can be perfectly fine for the restoration-scenario narrative
+    (damage_items replay) while its label can't be trusted for the
+    population-level historical rate (see data/data_quality.json)."""
+    if case is None:
+        return {"fallback": True, "reason": "No case data is available for this household."}
+    status = case.get("risk_status")
+    if status and status != "ok":
+        template = RISK_FALLBACK_REASONS.get(status, "Historical risk data is not available for this circuit.")
+        return {"fallback": True, "reason": template.format(station=case.get("substation"), circuit=case.get("circuit"))}
+    if case.get("circuit_id") not in _risk_model["circuits"]:
+        return {"fallback": True, "reason": "No exposure data is available for this circuit."}
+    return {"fallback": False, "reason": None}
 
-    unrepaired = [d for d in case["damage_items"] if not d.get("repaired", True)]
-    if unrepaired:
+
+def risk_band(case, repairs_complete=False):
+    """
+    Exposure-normalized historical damage rate per circuit, empirical-Bayes
+    shrunk toward the system-wide rate, scaled by storm setting (a stated
+    assumption), then mapped to Low/Moderate/High via fixed thresholds
+    computed from the shrunk-rate distribution across all circuits. This is
+    a relative historical rate, never a calibrated outage probability —
+    see data/backtest.json for how well it actually ranks damage out of
+    sample (the signal is weak; say so to the customer, don't oversell it).
+    """
+    if repairs_complete:
         return {
-            "band": "High",
-            "reason": "Unrepaired damage is assigned to this household's upstream path.",
+            "band": "Low",
+            "reason": "Repairs on this path are marked complete in this simulation.",
+            "evidence": "assumption",
         }
 
-    storm_band = {"calm": "Low", "moderate": "Moderate", "severe": "High"}[case["storm_setting"]]
+    circuit = _risk_model["circuits"][case["circuit_id"]]
+    multiplier = STORM_MULTIPLIER[case["storm_setting"]]
+    effective_rate = circuit["shrunk_rate"] * multiplier
+
+    if effective_rate <= BAND_THRESHOLDS["low_max"]:
+        band = "Low"
+    elif effective_rate <= BAND_THRESHOLDS["moderate_max"]:
+        band = "Moderate"
+    else:
+        band = "High"
+
     return {
-        "band": storm_band,
-        "reason": f"No unrepaired damage is assigned to this path; band follows the {case['storm_setting']} storm setting.",
+        "band": band,
+        "reason": (
+            f"Historical damage rate on this circuit ({circuit['damage_count']} of {circuit['customer_exposure']} "
+            f"customers' worth of exposure, shrunk toward the system rate) is {band.lower()}, scaled x{multiplier} "
+            f"for the {case['storm_setting']} storm setting — a demonstration rule, not a calibrated probability."
+        ),
+        "evidence": "model_estimate",
+        "base_rate": circuit["shrunk_rate"],
+        "effective_rate": round(effective_rate, 6),
+        "system_rate": _risk_model["overall"]["system_rate"],
+        "storm_multiplier": multiplier,
+        "exposure": circuit["customer_exposure"],
+        "damage_count": circuit["damage_count"],
     }
 
 
-def confidence(case, access_blocked=False):
-    """Derived from evidence quality, never from vibes."""
+def confidence(case, access_blocked=False, repairs_complete=False):
+    """Derived from evidence quality: effective sample size behind the
+    historical rate first, then the existing replay-specific caveats."""
     if not case.get("path_valid", True):
-        return {
-            "level": "Low",
-            "reason": "This household's upstream path failed consistency checks in the replay data.",
-        }
+        return {"level": "Low", "reason": "This household's upstream path failed consistency checks in the replay data."}
     if access_blocked:
+        return {"level": "Low", "reason": "This scenario uses an assumed access-delay duration (+3 h), not a measured one."}
+
+    risk_fallback = check_risk_fallback(case)
+    if not risk_fallback["fallback"] and not repairs_complete:
+        circuit = _risk_model["circuits"][case["circuit_id"]]
+        tier = circuit["confidence"]
+        if tier == "High":
+            return {
+                "level": "High",
+                "reason": f"This circuit has {circuit['customer_exposure']} customers' worth of exposure behind its historical rate — well past the point where the empirical-Bayes estimate stops leaning on the system average.",
+            }
+        if tier == "Medium":
+            return {
+                "level": "Medium",
+                "reason": f"This circuit has moderate exposure ({circuit['customer_exposure']} customers) behind its historical rate — assigning it to this household is still a replay assumption.",
+            }
         return {
             "level": "Low",
-            "reason": "This scenario uses an assumed access-delay duration (+3 h), not a measured one.",
+            "reason": f"This circuit has limited exposure ({circuit['customer_exposure']} customers) behind its historical rate, so the estimate leans heavily on the system-wide average.",
         }
+
     return {
         "level": "Medium",
         "reason": "Damage type and access flags come from source records, but assigning them to this household is a replay assumption.",
