@@ -73,7 +73,7 @@
   white-space: nowrap;
 }
 
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; overflow-x: hidden; }
 
 body {
   font-family: var(--font-body);
@@ -118,7 +118,7 @@ a { color: var(--color-primary); }
 .topbar {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   padding: var(--space-2) var(--space-2) var(--space-1);
   border-bottom: 1px solid var(--color-border);
 }
@@ -128,6 +128,8 @@ a { color: var(--color-primary); }
   font-weight: 700;
   font-size: 20px;
   margin-right: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .topbar select {
@@ -137,6 +139,9 @@ a { color: var(--color-primary); }
   border-radius: var(--radius-card);
   border: 1px solid var(--color-border);
   background: var(--color-card);
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 160px;
   color: var(--color-foreground);
   min-height: 44px;
 }
@@ -421,5 +426,6 @@ dialog .evidence-kind {
 @media (max-width: 480px) {
   .lanes { grid-template-columns: 1fr; }
   .message { max-width: 95%; }
-  .topbar { flex-wrap: wrap; }
+  .topbar { gap: 6px; padding-left: var(--space-1); padding-right: var(--space-1); }
+  #new-conversation-btn { padding-left: var(--space-1); padding-right: var(--space-1); min-width: auto; }
 }

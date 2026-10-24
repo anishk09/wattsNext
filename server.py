@@ -121,6 +121,7 @@ async def whatif_endpoint(request):
 
     after = tools.get_restoration_estimate(household_id, **session["scenario"])
     risk = tools.get_risk(household_id, session["scenario"]["repairs_complete"])
+    prep = tools.get_prep_guidance(household_id, session["scenario"]["repairs_complete"])
     alerts = tools.get_alert_info(household_id, **session["scenario"], previous_estimate=session["previous_estimate"])
     session["previous_estimate"] = {
         "low_hours": after.get("low_hours", {}).get("value"),
@@ -132,6 +133,7 @@ async def whatif_endpoint(request):
         "before": before,
         "after": after,
         "risk": risk,
+        "prep": prep,
         "alerts": alerts,
     })
 

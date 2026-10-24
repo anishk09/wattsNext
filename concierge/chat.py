@@ -75,7 +75,7 @@ def _offline_answer(intent, household_id, scenario):
         cards["risk"] = tools.get_risk(household_id, scenario["repairs_complete"])
     if intent in ("restoration", "risk_restoration", "overview"):
         cards["restoration"] = tools.get_restoration_estimate(household_id, **scenario)
-    if intent in ("prep", "overview"):
+    if intent in ("prep", "restoration", "risk_restoration", "overview"):
         cards["prep"] = tools.get_prep_guidance(household_id, scenario["repairs_complete"])
     if intent in ("alerts", "overview"):
         cards["alerts"] = tools.get_alert_info(household_id, **scenario)

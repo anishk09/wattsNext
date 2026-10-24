@@ -176,14 +176,21 @@
     const actionsLane = document.createElement("div");
     actionsLane.className = "lane";
     actionsLane.innerHTML = "<h4>What you can do</h4>";
-    const ul = document.createElement("ul");
     const actions = (prep && prep.actions) || [];
-    for (const a of actions) {
-      const li = document.createElement("li");
-      li.textContent = a;
-      ul.appendChild(li);
+    if (actions.length) {
+      const ul = document.createElement("ul");
+      for (const a of actions) {
+        const li = document.createElement("li");
+        li.textContent = a;
+        ul.appendChild(li);
+      }
+      actionsLane.appendChild(ul);
+    } else {
+      const p = document.createElement("p");
+      p.className = "empty-lane";
+      p.textContent = "Ask “What should I do to prepare?” for tailored guidance.";
+      actionsLane.appendChild(p);
     }
-    actionsLane.appendChild(ul);
     card.appendChild(actionsLane);
 
     return card;
@@ -343,7 +350,7 @@
     p.textContent = label;
     msg.appendChild(p);
 
-    renderCards({ risk: body.risk, restoration: body.after, alerts: body.alerts }, msg);
+    renderCards({ risk: body.risk, restoration: body.after, prep: body.prep, alerts: body.alerts }, msg);
     conversation.appendChild(msg);
     conversation.scrollTop = conversation.scrollHeight;
   }
