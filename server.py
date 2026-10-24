@@ -51,11 +51,11 @@ def _record_alerts(session, alerts_result):
 def _log_estimate_change(session, before, after):
     if before.get("fallback", {}).get("fallback") or after.get("fallback", {}).get("fallback"):
         return
-    if before["low_hours"]["value"] == after["low_hours"]["value"] and before["high_hours"]["value"] == after["high_hours"]["value"]:
+    if before["p10_hours"]["value"] == after["p10_hours"]["value"] and before["p90_hours"]["value"] == after["p90_hours"]["value"]:
         return
     _log_event(session, "estimate_changed", {
-        "before": [before["low_hours"]["value"], before["high_hours"]["value"]],
-        "after": [after["low_hours"]["value"], after["high_hours"]["value"]],
+        "before": [before["p10_hours"]["value"], before["p90_hours"]["value"]],
+        "after": [after["p10_hours"]["value"], after["p90_hours"]["value"]],
     })
 
 
@@ -120,12 +120,12 @@ async def chat_endpoint(request):
         if session["previous_estimate"] is not None:
             _log_estimate_change(session, {
                 "fallback": {"fallback": False},
-                "low_hours": {"value": session["previous_estimate"]["low_hours"]},
-                "high_hours": {"value": session["previous_estimate"]["high_hours"]},
+                "p10_hours": {"value": session["previous_estimate"]["p10_hours"]},
+                "p90_hours": {"value": session["previous_estimate"]["p90_hours"]},
             }, restoration)
         session["previous_estimate"] = {
-            "low_hours": restoration["low_hours"]["value"],
-            "high_hours": restoration["high_hours"]["value"],
+            "p10_hours": restoration["p10_hours"]["value"],
+            "p90_hours": restoration["p90_hours"]["value"],
         }
     if "alerts" in reply.get("cards", {}):
         _record_alerts(session, reply["cards"]["alerts"])
@@ -167,8 +167,8 @@ async def whatif_endpoint(request):
     _record_alerts(session, alerts)
 
     session["previous_estimate"] = {
-        "low_hours": after.get("low_hours", {}).get("value"),
-        "high_hours": after.get("high_hours", {}).get("value"),
+        "p10_hours": after.get("p10_hours", {}).get("value"),
+        "p90_hours": after.get("p90_hours", {}).get("value"),
     } if not after.get("fallback", {}).get("fallback") else None
 
     return JSONResponse({

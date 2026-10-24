@@ -4,20 +4,51 @@ from concierge import cases, engine, tools
 
 
 class TransformerAcceptanceRanges(unittest.TestCase):
-    """CLAUDE.md acceptance tests: must match exactly."""
+    """
+    Original CLAUDE.md acceptance numbers (fixed 75%-150% band):
+    baseline 6.7-13.5 h, blocked access 9.7-16.5 h.
+
+    Step 3 replaced that flat band with a seeded Monte Carlo over labor
+    hours (triangular(0.6x, 1.0x, 1.8x) per job — wider and right-skewed
+    versus the old symmetric-looking 0.75x-1.5x multiply) and crew
+    availability (a 0-1.5 h dispatch/travel delay per crew). Both the
+    reference effort (9.0 h, unchanged — same labor-workbook math as
+    before) and the shape of the new distribution explain the shift:
+    P10 (8.1 h) sits ABOVE the old low end (6.7 h) because the crew-delay
+    term has no symmetric downside, and the triangular's long right tail
+    pulls P50/P90 up a bit versus the old flat multiply. The new window
+    is narrower (8.1-14.0 vs 6.7-13.5) but shifted later — a materially
+    different, better-justified range, not the same numbers relabeled.
+    """
 
     def setUp(self):
         self.case = cases.get_case("transformer_roanoke")
 
     def test_baseline_range(self):
         result = engine.restoration_effort(self.case)
-        self.assertEqual(result["low_hours"], 6.7)
-        self.assertEqual(result["high_hours"], 13.5)
+        self.assertEqual(result["p10_hours"], 8.1)
+        self.assertEqual(result["p50_hours"], 10.8)
+        self.assertEqual(result["p90_hours"], 14.0)
 
     def test_blocked_access_range(self):
         result = engine.restoration_effort(self.case, access_blocked=True)
-        self.assertEqual(result["low_hours"], 9.7)
-        self.assertEqual(result["high_hours"], 16.5)
+        self.assertEqual(result["p10_hours"], 11.1)
+        self.assertEqual(result["p50_hours"], 13.7)
+        self.assertEqual(result["p90_hours"], 17.1)
+
+    def test_seeded_monte_carlo_is_reproducible(self):
+        # Same case + scenario must always give the same P10/P50/P90 —
+        # "seeded," not fresh noise every call, even across process restarts.
+        first = engine.restoration_effort(self.case)
+        second = engine.restoration_effort(self.case)
+        self.assertEqual(first, second)
+
+    def test_different_scenarios_get_different_seeds(self):
+        baseline = engine.restoration_effort(self.case)
+        blocked = engine.restoration_effort(self.case, access_blocked=True)
+        more_crews = engine.restoration_effort(self.case, extra_crews=2)
+        self.assertNotEqual(baseline["p50_hours"], blocked["p50_hours"])
+        self.assertNotEqual(baseline, more_crews)
 
 
 class ConfidenceLevels(unittest.TestCase):
@@ -110,7 +141,7 @@ class RiskFallback(unittest.TestCase):
         case = cases.get_case("wirepole_vinton")
         self.assertFalse(engine.check_fallback(case)["fallback"])
         estimate = engine.restoration_effort(case)
-        self.assertGreater(estimate["high_hours"], 0)
+        self.assertGreater(estimate["p90_hours"], 0)
 
     def test_tool_layer_falls_back_for_ambiguous_circuit(self):
         result = tools.get_risk("h4")  # household on wirepole_vinton
@@ -125,8 +156,8 @@ class RestorationCompleteFlow(unittest.TestCase):
     def test_repairs_complete_zeroes_the_estimate(self):
         case = cases.get_case("transformer_roanoke")
         result = engine.restoration_effort(case, repairs_complete=True)
-        self.assertEqual(result["low_hours"], 0.0)
-        self.assertEqual(result["high_hours"], 0.0)
+        self.assertEqual(result["p10_hours"], 0.0)
+        self.assertEqual(result["p90_hours"], 0.0)
 
     def test_tool_layer_reflects_repairs_complete(self):
         result = tools.get_restoration_estimate("h1", repairs_complete=True)
@@ -204,6 +235,35 @@ class ExtraCrewsShortenMultiJobCase(unittest.TestCase):
         baseline = engine.restoration_effort(case, extra_crews=0)
         with_crews = engine.restoration_effort(case, extra_crews=2)
         self.assertLessEqual(with_crews["reference_effort_hours"], baseline["reference_effort_hours"])
+
+
+class MonteCarloMechanism(unittest.TestCase):
+    """Engine-level checks on the simulation itself, not just the one
+    acceptance case's exact numbers."""
+
+    def test_percentiles_are_ordered(self):
+        for case_id in ("transformer_roanoke", "wirepole_vinton", "wire_montvale"):
+            result = engine.restoration_effort(cases.get_case(case_id))
+            self.assertLessEqual(result["p10_hours"], result["p50_hours"])
+            self.assertLessEqual(result["p50_hours"], result["p90_hours"])
+
+    def test_more_runs_converge_toward_fewer_runs(self):
+        # Sanity check on the simulation itself: raising MC_RUNS shouldn't
+        # move the percentiles by much for a single-job case.
+        case = cases.get_case("transformer_roanoke")
+        jobs = engine._jobs(engine.restoration_phases(case)["local"])
+        rng_small = engine.random.Random(1)
+        small = sorted(engine._simulate_makespan(rng_small, jobs, 1) for _ in range(200))
+        rng_large = engine.random.Random(1)
+        large = sorted(engine._simulate_makespan(rng_large, jobs, 1) for _ in range(5000))
+        self.assertAlmostEqual(
+            engine._percentile(small, 0.5), engine._percentile(large, 0.5), delta=1.5
+        )
+
+    def test_empty_damage_items_give_zero_for_every_percentile(self):
+        case = cases.get_case("calm_roanoke")
+        result = engine.restoration_effort(case)
+        self.assertEqual((result["p10_hours"], result["p50_hours"], result["p90_hours"]), (0.0, 0.0, 0.0))
 
 
 if __name__ == "__main__":

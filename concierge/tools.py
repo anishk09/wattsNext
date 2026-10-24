@@ -73,8 +73,9 @@ def get_restoration_estimate(household_id, access_blocked=False, extra_crews=0, 
 
     return {
         "fallback": {"fallback": False, "reason": None},
-        "low_hours": _tag(estimate["low_hours"], MODEL_ESTIMATE, "scenario range, not a confidence interval"),
-        "high_hours": _tag(estimate["high_hours"], MODEL_ESTIMATE, "scenario range, not a confidence interval"),
+        "p10_hours": _tag(estimate["p10_hours"], MODEL_ESTIMATE, f"10th percentile of {estimate['mc_runs']} seeded Monte Carlo runs over labor hours and crew availability"),
+        "p50_hours": _tag(estimate["p50_hours"], MODEL_ESTIMATE, f"median (50th percentile) of {estimate['mc_runs']} seeded Monte Carlo runs"),
+        "p90_hours": _tag(estimate["p90_hours"], MODEL_ESTIMATE, f"90th percentile of {estimate['mc_runs']} seeded Monte Carlo runs"),
         "reference_effort_hours": _tag(estimate["reference_effort_hours"], MODEL_ESTIMATE),
         "access_blocked": _tag(access_blocked, ASSUMPTION, "+3 h assumed delay when access is blocked"),
         "crew_count": _tag(estimate["crew_count"], ASSUMPTION, "baseline 1 crew; chip adds crews"),

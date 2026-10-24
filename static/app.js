@@ -164,11 +164,11 @@
     return card;
   }
 
-  function rangeBar(low, high, maxScale) {
+  function rangeBar(low, high, maxScale, median) {
     const wrap = document.createElement("div");
     const label = document.createElement("div");
     label.className = "range-bar-label";
-    label.textContent = "Model estimate — not confirmed by the utility (scenario range, not a confidence interval)";
+    label.textContent = "Model estimate — not confirmed by the utility (P10-P90, seeded Monte Carlo)";
     wrap.appendChild(label);
     const track = document.createElement("div");
     track.className = "range-bar-track";
@@ -179,10 +179,16 @@
     fill.style.left = leftPct + "%";
     fill.style.width = widthPct + "%";
     track.appendChild(fill);
+    if (median !== undefined) {
+      const marker = document.createElement("div");
+      marker.className = "range-bar-median";
+      marker.style.left = Math.min(100, (median / maxScale) * 100) + "%";
+      track.appendChild(marker);
+    }
     wrap.appendChild(track);
     const values = document.createElement("div");
     values.className = "range-bar-values";
-    values.innerHTML = `<span>${low.toFixed(1)} h</span><span>${high.toFixed(1)} h</span>`;
+    values.innerHTML = `<span>P10: ${low.toFixed(1)} h</span>${median !== undefined ? `<span>P50: ${median.toFixed(1)} h</span>` : ""}<span>P90: ${high.toFixed(1)} h</span>`;
     wrap.appendChild(values);
     return wrap;
   }
@@ -208,10 +214,11 @@
         p.textContent = "Power should be back on per this simulation.";
         estimateLane.appendChild(p);
       } else {
-        estimateLane.appendChild(rangeBar(restoration.low_hours.value, restoration.high_hours.value, 24));
+        estimateLane.appendChild(rangeBar(restoration.p10_hours.value, restoration.p90_hours.value, 24, restoration.p50_hours.value));
         const tagRow = document.createElement("div");
-        appendChild(tagRow, evidenceTag(restoration.low_hours, "low"));
-        appendChild(tagRow, evidenceTag(restoration.high_hours, "high"));
+        appendChild(tagRow, evidenceTag(restoration.p10_hours, "P10"));
+        appendChild(tagRow, evidenceTag(restoration.p50_hours, "P50"));
+        appendChild(tagRow, evidenceTag(restoration.p90_hours, "P90"));
         estimateLane.appendChild(tagRow);
         if (restoration.nearest_closed_device) {
           const stepRow = document.createElement("p");
@@ -402,11 +409,11 @@
     const msg = document.createElement("div");
     msg.className = "message assistant";
 
-    if (!body.after.fallback.fallback && body.before.low_hours && body.after.low_hours) {
+    if (!body.after.fallback.fallback && body.before.p10_hours && body.after.p10_hours) {
       const before = body.before, after = body.after;
       const ba = document.createElement("div");
       ba.className = "before-after";
-      ba.innerHTML = `<span class="before">${before.low_hours.value}-${before.high_hours.value} h</span><span>→</span><span class="after">${after.low_hours.value}-${after.high_hours.value} h</span>`;
+      ba.innerHTML = `<span class="before">${before.p10_hours.value}-${before.p90_hours.value} h</span><span>→</span><span class="after">${after.p10_hours.value}-${after.p90_hours.value} h</span>`;
       msg.appendChild(ba);
     }
 
@@ -530,16 +537,17 @@
       p.textContent = "Power should be back on per this simulation.";
       estimateSection.appendChild(p);
     } else {
-      if (data.previous_estimate && (data.previous_estimate.low_hours !== data.restoration.low_hours.value || data.previous_estimate.high_hours !== data.restoration.high_hours.value)) {
+      if (data.previous_estimate && (data.previous_estimate.p10_hours !== data.restoration.p10_hours.value || data.previous_estimate.p90_hours !== data.restoration.p90_hours.value)) {
         const ba = document.createElement("div");
         ba.className = "before-after";
-        ba.innerHTML = `<span class="before">${data.previous_estimate.low_hours}-${data.previous_estimate.high_hours} h</span><span>→</span><span class="after">${data.restoration.low_hours.value}-${data.restoration.high_hours.value} h</span>`;
+        ba.innerHTML = `<span class="before">${data.previous_estimate.p10_hours}-${data.previous_estimate.p90_hours} h</span><span>→</span><span class="after">${data.restoration.p10_hours.value}-${data.restoration.p90_hours.value} h</span>`;
         estimateSection.appendChild(ba);
       }
-      estimateSection.appendChild(rangeBar(data.restoration.low_hours.value, data.restoration.high_hours.value, 24));
+      estimateSection.appendChild(rangeBar(data.restoration.p10_hours.value, data.restoration.p90_hours.value, 24, data.restoration.p50_hours.value));
       const tagRow = document.createElement("div");
-      appendChild(tagRow, evidenceTag(data.restoration.low_hours, "low"));
-      appendChild(tagRow, evidenceTag(data.restoration.high_hours, "high"));
+      appendChild(tagRow, evidenceTag(data.restoration.p10_hours, "P10"));
+      appendChild(tagRow, evidenceTag(data.restoration.p50_hours, "P50"));
+      appendChild(tagRow, evidenceTag(data.restoration.p90_hours, "P90"));
       estimateSection.appendChild(tagRow);
     }
     grid.appendChild(estimateSection);

@@ -100,8 +100,9 @@ def _render_offline_text(intent, cards):
             parts.append("Power should be back on per this simulation — if yours is still out, check your breakers, then report it.")
         else:
             parts.append(
-                f"Estimated restoration: {e['low_hours']['value']}-{e['high_hours']['value']} hours. "
-                "This is a scenario range, not a confidence interval, and not confirmed by the utility."
+                f"Estimated restoration: {e['p10_hours']['value']}-{e['p90_hours']['value']} hours "
+                f"(median {e['p50_hours']['value']}), from a seeded Monte Carlo simulation. "
+                "Not confirmed by the utility."
             )
     if "prep" in cards:
         all_actions = cards["prep"]["actions"]

@@ -80,16 +80,16 @@ def build_alert_previews(household, case, estimate, previous_estimate=None):
             "type": "outage_confirmed",
             "timing": "Sent once damage is assigned to your upstream path.",
             "channel": _channel_label(channel),
-            "message": f"Watt'sNext: We show damage affecting power to your area ({city}). Estimated restoration: {estimate['low_hours']:.1f}-{estimate['high_hours']:.1f} h. This is a model estimate, not confirmed by the utility.",
+            "message": f"Watt'sNext: We show damage affecting power to your area ({city}). Estimated restoration: {estimate['p10_hours']:.1f}-{estimate['p90_hours']:.1f} h (median {estimate['p50_hours']:.1f} h). This is a model estimate, not confirmed by the utility.",
         })
 
-    moved = previous_estimate is not None and abs(estimate["high_hours"] - previous_estimate["high_hours"]) >= ESTIMATE_CHANGE_THRESHOLD_HOURS
+    moved = previous_estimate is not None and abs(estimate["p90_hours"] - previous_estimate["p90_hours"]) >= ESTIMATE_CHANGE_THRESHOLD_HOURS
     if moved:
         previews.append({
             "type": "estimate_updated",
             "timing": "Sent when the estimate moves by 2 hours or more.",
             "channel": _channel_label(channel),
-            "message": f"Watt'sNext update: new estimated restoration window is {estimate['low_hours']:.1f}-{estimate['high_hours']:.1f} h (was {previous_estimate['low_hours']:.1f}-{previous_estimate['high_hours']:.1f} h).",
+            "message": f"Watt'sNext update: new estimated restoration window is {estimate['p10_hours']:.1f}-{estimate['p90_hours']:.1f} h (was {previous_estimate['p10_hours']:.1f}-{previous_estimate['p90_hours']:.1f} h).",
         })
 
     if estimate["reference_effort_hours"] == 0.0:

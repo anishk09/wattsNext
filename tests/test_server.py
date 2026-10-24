@@ -57,8 +57,8 @@ class WhatIfFlow(unittest.TestCase):
     def test_block_access_moves_the_range_and_shows_before_after(self):
         resp = self.client.post("/api/whatif", json={"session_id": self.session_id, "action": "block_access"})
         body = resp.json()
-        self.assertEqual(body["before"]["low_hours"]["value"], 6.7)
-        self.assertEqual(body["after"]["low_hours"]["value"], 9.7)
+        self.assertEqual(body["before"]["p10_hours"]["value"], 8.1)
+        self.assertEqual(body["after"]["p10_hours"]["value"], 11.1)
 
     def test_complete_repairs_triggers_restoration_complete_message(self):
         resp = self.client.post("/api/whatif", json={"session_id": self.session_id, "action": "complete_repairs"})

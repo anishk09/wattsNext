@@ -2,13 +2,22 @@
 Pure calculation engine. No AI calls here — every number the assistant
 shows comes from this module so the model only explains, never invents.
 """
+import hashlib
 import json
 import pathlib
+import random
 
 DATA = pathlib.Path(__file__).parent.parent / "data"
 ACCESS_BLOCKED_HOURS = 3.0
-RANGE_LOW_FACTOR = 0.75
-RANGE_HIGH_FACTOR = 1.5
+
+# Monte Carlo parameters — all stated assumptions, not fit from data (this
+# sample has no historical per-job duration variance to fit against).
+MC_RUNS = 2000
+# Per-job labor hours: triangular(min, mode, max) around the reference hour
+# figure, replacing the old flat 75%-150% band with an actual distribution.
+JOB_DURATION_TRIANGULAR = {"min_factor": 0.6, "mode_factor": 1.0, "max_factor": 1.8}
+# Per-crew dispatch/travel delay before that crew's first job starts.
+CREW_AVAILABILITY_DELAY_HOURS = {"low": 0.0, "high": 1.5}
 
 _labor = json.loads((DATA / "labor_reference.json").read_text())
 ILM = _labor["indirect_multiplier"]
@@ -157,37 +166,81 @@ def job_timeline(case, crew_count=1, repairs_complete=False):
     return timeline
 
 
+def _mc_seed(case, access_blocked, extra_crews):
+    """Stable across processes (unlike Python's randomized str hash()), so
+    the same case+scenario always reproduces the same P10/P50/P90 —
+    'seeded Monte Carlo', not fresh noise on every call."""
+    key = f"{case.get('case_id')}|{access_blocked}|{extra_crews}"
+    return int(hashlib.sha256(key.encode()).hexdigest()[:8], 16)
+
+
+def _simulate_makespan(rng, jobs, crew_count):
+    if not jobs:
+        return 0.0  # no damage => no crew dispatched => no delay sampled
+    sampled = []
+    for job in jobs:
+        ref = job["duration"]
+        sampled.append(rng.triangular(
+            ref * JOB_DURATION_TRIANGULAR["min_factor"],
+            ref * JOB_DURATION_TRIANGULAR["max_factor"],
+            ref * JOB_DURATION_TRIANGULAR["mode_factor"],
+        ))
+    loads = [rng.uniform(CREW_AVAILABILITY_DELAY_HOURS["low"], CREW_AVAILABILITY_DELAY_HOURS["high"]) for _ in range(crew_count)]
+    for duration in sorted(sampled, reverse=True):
+        i = loads.index(min(loads))
+        loads[i] += duration
+    return max(loads) if loads else 0.0
+
+
+def _percentile(sorted_samples, p):
+    if not sorted_samples:
+        return 0.0
+    idx = min(len(sorted_samples) - 1, int(round(p * (len(sorted_samples) - 1))))
+    return sorted_samples[idx]
+
+
 def restoration_effort(case, access_blocked=False, extra_crews=0, repairs_complete=False):
     """
-    Returns the restoration-time range for a case's damage items.
-    Evidence: every hour value traces to labor_reference.json (source_data or
-    assumption, per category); quantity and crew count are modeling assumptions.
+    Seeded Monte Carlo over labor hours (triangular distribution per job,
+    replacing the old flat 75%-150% band) and crew availability (a
+    dispatch/travel delay per crew before its first job). Returns
+    P10/P50/P90 hours, never a single number presented as certain.
+    Evidence: every hour value traces to labor_reference.json (source_data
+    or assumption, per category); the distribution shapes themselves are
+    stated assumptions (see MODEL_CARD.md), not fit from data.
     """
+    crew_count = 1 + extra_crews
     if repairs_complete:
         return {
             "reference_effort_hours": 0.0,
-            "low_hours": 0.0,
-            "high_hours": 0.0,
+            "p10_hours": 0.0,
+            "p50_hours": 0.0,
+            "p90_hours": 0.0,
             "access_blocked": access_blocked,
-            "crew_count": 1 + extra_crews,
+            "crew_count": crew_count,
+            "mc_runs": MC_RUNS,
         }
 
     jobs = _jobs(restoration_phases(case)["local"])
-    crew_count = 1 + extra_crews
     reference_effort = _makespan(jobs, crew_count)
 
-    low = reference_effort * RANGE_LOW_FACTOR
-    high = reference_effort * RANGE_HIGH_FACTOR
+    rng = random.Random(_mc_seed(case, access_blocked, extra_crews))
+    samples = sorted(_simulate_makespan(rng, jobs, crew_count) for _ in range(MC_RUNS))
+    p10, p50, p90 = _percentile(samples, 0.10), _percentile(samples, 0.50), _percentile(samples, 0.90)
+
     if access_blocked:
-        low += ACCESS_BLOCKED_HOURS
-        high += ACCESS_BLOCKED_HOURS
+        p10 += ACCESS_BLOCKED_HOURS
+        p50 += ACCESS_BLOCKED_HOURS
+        p90 += ACCESS_BLOCKED_HOURS
 
     return {
         "reference_effort_hours": round(reference_effort, 1),
-        "low_hours": round(low, 1),
-        "high_hours": round(high, 1),
+        "p10_hours": round(p10, 1),
+        "p50_hours": round(p50, 1),
+        "p90_hours": round(p90, 1),
         "access_blocked": access_blocked,
         "crew_count": crew_count,
+        "mc_runs": MC_RUNS,
     }
 
 

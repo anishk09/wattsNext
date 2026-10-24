@@ -349,6 +349,14 @@ a { color: var(--color-link); }
   border-radius: 999px;
 }
 
+.range-bar-median {
+  position: absolute;
+  top: -2px; bottom: -2px;
+  width: 2px;
+  background: var(--color-card-foreground);
+  transform: translateX(-1px);
+}
+
 .range-bar-values {
   display: flex;
   justify-content: space-between;
