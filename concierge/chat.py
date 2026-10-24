@@ -60,9 +60,8 @@ def _offline_answer(intent, household_id, scenario):
     fallback = tools.get_fallback_status(household_id)
     if fallback["fallback"]:
         return {
-            "text": f"We can't give a reliable estimate for this location. {fallback['reason']} "
-                    "Follow general storm safety guidance and check the official Appalachian Power outage "
-                    "map for live information.",
+            "text": f"{fallback['reason']} Follow general storm safety guidance and check the official "
+                    "Appalachian Power outage map for live information.",
             "cards": {},
             "fallback": True,
         }
@@ -97,8 +96,14 @@ def _render_offline_text(intent, cards):
                 "This is a scenario range, not a confidence interval, and not confirmed by the utility."
             )
     if "prep" in cards:
-        actions = cards["prep"]["actions"][:3]
-        parts.append("What you can do: " + "; ".join(actions) + ".")
+        all_actions = cards["prep"]["actions"]
+        if intent == "prep":
+            shown = all_actions
+        else:
+            safety = [a for a in all_actions if a.startswith("SAFETY:")]
+            other = [a for a in all_actions if not a.startswith("SAFETY:")]
+            shown = safety + other[: max(1, 3 - len(safety))]
+        parts.append("What you can do: " + "; ".join(shown) + ".")
     if "alerts" in cards:
         a = cards["alerts"]
         if a["eligible"]:

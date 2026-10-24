@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Watt'sNext</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <span class="brand">Watt'sNext</span>
+      <label for="household-select" class="visually-hidden">Choose a household</label>
+      <select id="household-select" aria-label="Choose a sample household by city"></select>
+      <button id="new-conversation-btn" aria-label="Start a new conversation">New</button>
+      <button id="settings-btn" class="icon-btn" aria-label="Open settings">⚙</button>
+    </header>
+
+    <main id="conversation" class="conversation" aria-live="polite" aria-relevant="additions">
+      <div class="empty-state" id="empty-state">
+        <h1>Watt'sNext</h1>
+        <p class="tagline">Know what's next when the power goes out.</p>
+        <div class="starter-questions">
+          <button data-question="Will I lose power and for how long?">Will I lose power and for how long?</button>
+          <button data-question="How long could repairs take?">How long could repairs take?</button>
+          <button data-question="What should I do to prepare?">What should I do to prepare?</button>
+          <button data-question="Do I qualify for outage alerts?">Do I qualify for outage alerts?</button>
+        </div>
+      </div>
+    </main>
+
+    <div class="chips" id="whatif-chips" hidden>
+      <button data-action="block_access">What if access is blocked?</button>
+      <button data-action="add_crews">What if 2 more crews arrive?</button>
+      <button data-action="complete_repairs">What if repairs finish?</button>
+      <button data-action="reset">Start over before the storm</button>
+    </div>
+
+    <form class="composer" id="composer">
+      <label for="message-input" class="visually-hidden">Message</label>
+      <input id="message-input" type="text" placeholder="Ask about your power..." autocomplete="off">
+      <button type="submit">Send</button>
+    </form>
+  </div>
+
+  <dialog id="evidence-dialog">
+    <span class="evidence-kind" id="evidence-kind"></span>
+    <p id="evidence-note"></p>
+    <button id="evidence-close">Close</button>
+  </dialog>
+
+  <dialog id="settings-dialog">
+    <h2>Settings</h2>
+    <div class="settings-grid">
+      <div>
+        <label for="api-key-input">Gemini API key</label>
+        <input id="api-key-input" type="password" placeholder="Paste your key">
+      </div>
+      <div>
+        <label><input id="offline-toggle" type="checkbox"> Offline explanation mode</label>
+      </div>
+      <div class="status-line" id="settings-status">Not connected.</div>
+      <div>
+        <label for="theme-select">Theme</label>
+        <select id="theme-select">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+      <button id="settings-save">Save</button>
+      <button id="settings-close">Close</button>
+    </div>
+  </dialog>
+
+  <template id="offer-offline-template">
+    <div class="card">
+      <p>The AI provider isn't available right now. Switch to offline mode?</p>
+      <button type="button" id="offer-offline-btn">Use offline mode</button>
+    </div>
+  </template>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
