@@ -104,11 +104,18 @@ browser — only city names and circuit-level damage summaries.
   exercise it end-to-end. Offline mode (fully tested) is the guaranteed
   fallback path and is what the demo should lean on if the live call is
   flaky.
-- **Not verified:** a live browser/visual pass (no browser automation tool
-  was available in this environment). HTML/JS were checked for parse and
-  syntax errors; the layout was built to the 375px/desktop breakpoints
-  described in `static/DESIGN.md`, but someone should open it in an actual
-  browser before the demo and fix anything that looks off.
+- **Verified in a real browser** (headless Chrome, driven via CDP since
+  this machine's `--window-size` flag floors around 500px and silently
+  clamps anything smaller — a true 375px viewport needs a device-metrics
+  override) at both desktop and a true 375px mobile width: topbar, starter
+  questions, what-if chips, risk/restoration/alerts cards, and SMS-style
+  alert previews all wrap correctly with no horizontal overflow, in both
+  flows (direct chat and the what-if chips). One real bug was caught and
+  fixed this way: the three-lane card's "What you can do" lane rendered
+  empty whenever a restoration estimate was shown without prep guidance
+  alongside it (the compound "will I lose power and for how long" question,
+  and every what-if chip response) — restoration answers now always
+  include prep guidance, and the UI has a defensive fallback besides.
 - **Never implemented on purpose:** live weather/outage/crew-position data,
   shelter status, compensation/credit eligibility, or any inference of
   health information — all explicitly out of scope per the brief's hard
