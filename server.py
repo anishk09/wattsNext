@@ -4,6 +4,7 @@ connection. Binds to 127.0.0.1 only. No API keys are ever logged or written
 to disk — they live only in the in-memory SETTINGS dict for this process.
 """
 import uuid
+from datetime import datetime, timezone
 
 import uvicorn
 from starlette.applications import Starlette
@@ -11,7 +12,7 @@ from starlette.responses import JSONResponse, FileResponse
 from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 
-from concierge import cases, chat, gemini, tools
+from concierge import cases, chat, customer_services, gemini, tools
 
 SETTINGS = {"api_key": None, "model": None, "offline_mode": False, "last_error": None}
 SESSIONS = {}
@@ -26,8 +27,36 @@ def _new_session(household_id):
         "scenario": dict(DEFAULT_SCENARIO),
         "history": [],
         "previous_estimate": None,
+        "events": [],
+        "triggered_alerts": {},
     }
     return session_id
+
+
+def _log_event(session, event_type, detail):
+    session["events"].append({
+        "type": event_type,
+        "detail": detail,
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    })
+
+
+def _record_alerts(session, alerts_result):
+    for preview in alerts_result.get("message_previews", []):
+        if preview["type"] not in session["triggered_alerts"]:
+            session["triggered_alerts"][preview["type"]] = preview
+            _log_event(session, "alert_previewed", {"alert_type": preview["type"], "message": preview["message"]})
+
+
+def _log_estimate_change(session, before, after):
+    if before.get("fallback", {}).get("fallback") or after.get("fallback", {}).get("fallback"):
+        return
+    if before["low_hours"]["value"] == after["low_hours"]["value"] and before["high_hours"]["value"] == after["high_hours"]["value"]:
+        return
+    _log_event(session, "estimate_changed", {
+        "before": [before["low_hours"]["value"], before["high_hours"]["value"]],
+        "after": [after["low_hours"]["value"], after["high_hours"]["value"]],
+    })
 
 
 async def list_cities(request):
@@ -86,11 +115,20 @@ async def chat_endpoint(request):
     session["history"].append({"role": "user", "parts": [{"text": message}]})
     if reply.get("text"):
         session["history"].append({"role": "model", "parts": [{"text": reply["text"]}]})
-    if "restoration" in reply.get("cards", {}):
+    restoration = reply.get("cards", {}).get("restoration")
+    if restoration and not restoration.get("fallback", {}).get("fallback"):
+        if session["previous_estimate"] is not None:
+            _log_estimate_change(session, {
+                "fallback": {"fallback": False},
+                "low_hours": {"value": session["previous_estimate"]["low_hours"]},
+                "high_hours": {"value": session["previous_estimate"]["high_hours"]},
+            }, restoration)
         session["previous_estimate"] = {
-            "low_hours": reply["cards"]["restoration"]["low_hours"]["value"],
-            "high_hours": reply["cards"]["restoration"]["high_hours"]["value"],
+            "low_hours": restoration["low_hours"]["value"],
+            "high_hours": restoration["high_hours"]["value"],
         }
+    if "alerts" in reply.get("cards", {}):
+        _record_alerts(session, reply["cards"]["alerts"])
 
     return JSONResponse(reply)
 
@@ -118,11 +156,16 @@ async def whatif_endpoint(request):
     before = tools.get_restoration_estimate(household_id, **session["scenario"])
 
     WHATIF_ACTIONS[action](session["scenario"])
+    _log_event(session, "whatif_applied", {"action": action})
 
     after = tools.get_restoration_estimate(household_id, **session["scenario"])
     risk = tools.get_risk(household_id, session["scenario"]["repairs_complete"])
     prep = tools.get_prep_guidance(household_id, session["scenario"]["repairs_complete"])
     alerts = tools.get_alert_info(household_id, **session["scenario"], previous_estimate=session["previous_estimate"])
+
+    _log_estimate_change(session, before, after)
+    _record_alerts(session, alerts)
+
     session["previous_estimate"] = {
         "low_hours": after.get("low_hours", {}).get("value"),
         "high_hours": after.get("high_hours", {}).get("value"),
@@ -135,6 +178,39 @@ async def whatif_endpoint(request):
         "risk": risk,
         "prep": prep,
         "alerts": alerts,
+    })
+
+
+async def dashboard_endpoint(request):
+    session_id = request.query_params.get("session_id")
+    session = _session_or_404(session_id)
+    if session is None:
+        return JSONResponse({"error": "unknown session_id"}, status_code=404)
+
+    household_id = session["household_id"]
+    scenario = session["scenario"]
+    risk = tools.get_risk(household_id, scenario["repairs_complete"])
+    restoration = tools.get_restoration_estimate(household_id, **scenario)
+    timeline = tools.get_job_timeline(household_id, extra_crews=scenario["extra_crews"], repairs_complete=scenario["repairs_complete"])
+
+    alerts = []
+    for alert_type in customer_services.ALERT_TYPES:
+        triggered = session["triggered_alerts"].get(alert_type)
+        alerts.append({
+            "type": alert_type,
+            "timing": customer_services.ALERT_TIMINGS[alert_type],
+            "triggered": triggered is not None,
+            "message": triggered["message"] if triggered else None,
+        })
+
+    return JSONResponse({
+        "scenario": scenario,
+        "risk": risk,
+        "restoration": restoration,
+        "previous_estimate": session["previous_estimate"],
+        "timeline": timeline,
+        "alerts": alerts,
+        "events": list(reversed(session["events"])),
     })
 
 
@@ -183,6 +259,7 @@ app = Starlette(routes=[
     Route("/api/session", create_session, methods=["POST"]),
     Route("/api/chat", chat_endpoint, methods=["POST"]),
     Route("/api/whatif", whatif_endpoint, methods=["POST"]),
+    Route("/api/dashboard", dashboard_endpoint),
     Route("/api/settings", get_settings, methods=["GET"]),
     Route("/api/settings", update_settings, methods=["POST"]),
     Mount("/static", StaticFiles(directory="static"), name="static"),

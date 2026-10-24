@@ -1,18 +1,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap');
 
 :root {
-  --color-primary: #2563EB;
+  /* AEP-inspired brand colors (never the AEP logo/wordmark) */
+  --color-primary: #1B365D;      /* deep navy — primary buttons, links, headers */
   --color-on-primary: #FFFFFF;
-  --color-accent: #D97706;
-  --color-destructive: #DC2626;
+  --color-accent: #29A8DF;       /* bright blue — secondary accents, active states */
+  --color-on-accent: #0B1E33;
+  --color-highlight: #F5B335;    /* gold — sparing highlight */
+  --color-on-highlight: #1B365D;
+  --color-destructive: #D7262E;  /* thin red accent — used sparingly */
   --color-background: #F8FAFC;
+  --color-panel: #E8F1F8;        /* pale blue — dashboard panels */
   --color-foreground: #1E293B;
   --color-card: #FFFFFF;
   --color-card-foreground: #1E293B;
-  --color-muted: #E9EFF8;
+  --color-muted: #E8F1F8;
   --color-muted-foreground: #475569;
-  --color-border: #E2E8F0;
-  --color-ring: #2563EB;
+  --color-border: #D7E3EE;
+  --color-ring: #1B365D;
+
+  /* Risk colors stay a distinct hue family from the brand palette above */
+  --color-risk-low: #15803D;
+  --color-risk-moderate: #C2410C;
+  --color-risk-high: #B91C1C;
 
   --space-1: 8px;
   --space-2: 16px;
@@ -31,39 +41,58 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-primary: #60A5FA;
-    --color-on-primary: #0F172A;
-    --color-accent: #FBBF24;
+    --color-primary: #29A8DF;
+    --color-on-primary: #0B1E33;
+    --color-accent: #29A8DF;
+    --color-on-accent: #0B1E33;
+    --color-highlight: #F5B335;
+    --color-on-highlight: #F5B335;
     --color-destructive: #F87171;
     --color-background: #0F172A;
+    --color-panel: #16314F;
     --color-foreground: #E2E8F0;
     --color-card: #1E293B;
     --color-card-foreground: #E2E8F0;
-    --color-muted: #243244;
+    --color-muted: #16314F;
     --color-muted-foreground: #94A3B8;
-    --color-border: #334155;
-    --color-ring: #60A5FA;
+    --color-border: #2B4A6B;
+    --color-ring: #29A8DF;
+    --color-risk-low: #4ADE80;
+    --color-risk-moderate: #FB923C;
+    --color-risk-high: #F87171;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --color-primary: #60A5FA;
-  --color-on-primary: #0F172A;
-  --color-accent: #FBBF24;
+  --color-primary: #29A8DF;
+  --color-on-primary: #0B1E33;
+  --color-accent: #29A8DF;
+  --color-on-accent: #0B1E33;
+  --color-highlight: #F5B335;
+  --color-on-highlight: #F5B335;
   --color-destructive: #F87171;
   --color-background: #0F172A;
+  --color-panel: #16314F;
   --color-foreground: #E2E8F0;
   --color-card: #1E293B;
   --color-card-foreground: #E2E8F0;
-  --color-muted: #243244;
+  --color-muted: #16314F;
   --color-muted-foreground: #94A3B8;
-  --color-border: #334155;
-  --color-ring: #60A5FA;
+  --color-border: #2B4A6B;
+  --color-ring: #29A8DF;
+  --color-risk-low: #4ADE80;
+  --color-risk-moderate: #FB923C;
+  --color-risk-high: #F87171;
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
+
+/* Several elements below set `display` via a class rule, which otherwise
+   beats the `hidden` attribute's UA-stylesheet `display: none` in the
+   cascade. This keeps `hidden` authoritative everywhere. */
+[hidden] { display: none !important; }
 
 .visually-hidden {
   position: absolute;
@@ -212,7 +241,7 @@ a { color: var(--color-primary); }
 .offline-banner {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-accent);
+  color: var(--color-destructive);
   margin-bottom: var(--space-1);
 }
 
@@ -264,12 +293,12 @@ a { color: var(--color-primary); }
 }
 
 .risk-chip .dot { width: 10px; height: 10px; border-radius: 50%; }
-.risk-Low { background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: var(--color-primary); }
-.risk-Low .dot { background: var(--color-primary); }
-.risk-Moderate { background: color-mix(in srgb, var(--color-accent) 18%, transparent); color: var(--color-accent); }
-.risk-Moderate .dot { background: var(--color-accent); }
-.risk-High { background: color-mix(in srgb, var(--color-destructive) 15%, transparent); color: var(--color-destructive); }
-.risk-High .dot { background: var(--color-destructive); }
+.risk-Low { background: color-mix(in srgb, var(--color-risk-low) 15%, transparent); color: var(--color-risk-low); }
+.risk-Low .dot { background: var(--color-risk-low); }
+.risk-Moderate { background: color-mix(in srgb, var(--color-risk-moderate) 18%, transparent); color: var(--color-risk-moderate); }
+.risk-Moderate .dot { background: var(--color-risk-moderate); }
+.risk-High { background: color-mix(in srgb, var(--color-risk-high) 15%, transparent); color: var(--color-risk-high); }
+.risk-High .dot { background: var(--color-risk-high); }
 
 .confidence-label {
   font-size: 13px;
@@ -428,4 +457,148 @@ dialog .evidence-kind {
   .message { max-width: 95%; }
   .topbar { gap: 6px; padding-left: var(--space-1); padding-right: var(--space-1); }
   #new-conversation-btn { padding-left: var(--space-1); padding-right: var(--space-1); min-width: auto; }
+}
+
+/* View toggle + dashboard */
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.view-toggle button {
+  border: none;
+  border-radius: 0;
+  min-height: 40px;
+  padding: 6px var(--space-1);
+  font-size: 14px;
+  background: var(--color-card);
+}
+
+.view-toggle button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.dashboard {
+  padding: var(--space-2);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.honesty-strip {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-destructive);
+  border-radius: var(--radius-card);
+  padding: var(--space-1) var(--space-2);
+  font-size: 13px;
+  color: var(--color-foreground);
+  margin-bottom: var(--space-2);
+}
+
+.dashboard h2 {
+  font-size: 22px;
+  margin: 0 0 var(--space-1);
+}
+
+.dashboard-section {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.dashboard-section h3 {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  margin: 0 0 var(--space-1);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.timeline-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.timeline-row:last-child { border-bottom: none; }
+
+.crew-badge {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 12px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
+.status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-radius: var(--radius-pill);
+  padding: 2px 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.status-pending { background: var(--color-muted); color: var(--color-muted-foreground); }
+.status-in_progress { background: color-mix(in srgb, var(--color-highlight) 30%, transparent); color: var(--color-on-highlight); }
+.status-complete { background: color-mix(in srgb, var(--color-risk-low) 18%, transparent); color: var(--color-risk-low); }
+
+.alert-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.alert-row:last-child { border-bottom: none; }
+.alert-row .alert-name { font-weight: 600; font-size: 14px; }
+.alert-row .alert-timing { font-size: 12px; color: var(--color-muted-foreground); }
+.alert-row .alert-msg { font-size: 13px; margin-top: 2px; }
+
+.triggered-badge, .not-triggered-badge {
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.triggered-badge { background: color-mix(in srgb, var(--color-risk-low) 18%, transparent); color: var(--color-risk-low); }
+.not-triggered-badge { background: var(--color-muted); color: var(--color-muted-foreground); }
+
+.event-row {
+  display: flex;
+  gap: var(--space-1);
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.event-row:last-child { border-bottom: none; }
+.event-row time { color: var(--color-muted-foreground); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
+/* Placed last so it wins over the unconditional rules above at this width */
+@media (max-width: 480px) {
+  .topbar { flex-wrap: wrap; row-gap: var(--space-1); }
+  .dashboard-grid { grid-template-columns: 1fr; }
 }

@@ -10,6 +10,10 @@
   <div class="app">
     <header class="topbar">
       <span class="brand">Watt'sNext</span>
+      <div class="view-toggle" role="group" aria-label="Choose view">
+        <button type="button" id="view-ask-btn" aria-pressed="true">Ask</button>
+        <button type="button" id="view-dashboard-btn" aria-pressed="false">Storm activity</button>
+      </div>
       <label for="household-select" class="visually-hidden">Choose a household</label>
       <select id="household-select" aria-label="Choose a sample household by city"></select>
       <button id="new-conversation-btn" aria-label="Start a new conversation">New</button>
@@ -28,6 +32,12 @@
         </div>
       </div>
     </main>
+
+    <section id="dashboard-view" class="dashboard" hidden aria-live="polite">
+      <div class="honesty-strip">Replay of recorded AEP damage. Not live outage, crew, or weather data.</div>
+      <h2>Storm replay</h2>
+      <div id="dashboard-content"></div>
+    </section>
 
     <div class="chips" id="whatif-chips" hidden>
       <button data-action="block_access">What if access is blocked?</button>

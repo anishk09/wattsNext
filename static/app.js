@@ -10,6 +10,7 @@
 
   let sessionId = null;
   let lastEstimate = null; // for before/after rendering on chip use
+  let currentView = "ask";
 
   const EVIDENCE_LABELS = {
     source_data: "Source data",
@@ -72,6 +73,7 @@
     conversation.appendChild(emptyState);
     emptyState.hidden = false;
     chips.hidden = false;
+    if (currentView === "dashboard") loadDashboard();
   }
 
   function evidenceTag(tag, labelOverride) {
@@ -294,6 +296,7 @@
     if (body.cards && body.cards.restoration && !body.cards.restoration.fallback.fallback) {
       lastEstimate = body.cards.restoration;
     }
+    if (currentView === "dashboard") loadDashboard();
   }
 
   function offerOfflineMode() {
@@ -353,6 +356,8 @@
     renderCards({ risk: body.risk, restoration: body.after, prep: body.prep, alerts: body.alerts }, msg);
     conversation.appendChild(msg);
     conversation.scrollTop = conversation.scrollHeight;
+
+    if (currentView === "dashboard") loadDashboard();
   }
 
   document.getElementById("empty-state").addEventListener("click", (e) => {
@@ -407,6 +412,173 @@
   });
 
   document.getElementById("theme-select").addEventListener("change", (e) => setTheme(e.target.value));
+
+  // Storm activity dashboard
+  const ALERT_LABELS = {
+    pre_storm: "Pre-storm",
+    outage_confirmed: "Outage confirmed",
+    estimate_updated: "Estimate updated",
+    restoration_complete: "Restoration complete",
+  };
+  function eventText(event) {
+    if (event.type === "whatif_applied") return "What-if: " + event.detail.action.replace(/_/g, " ");
+    if (event.type === "estimate_changed") return `Estimate changed: ${event.detail.before[0]}-${event.detail.before[1]} h → ${event.detail.after[0]}-${event.detail.after[1]} h`;
+    if (event.type === "alert_previewed") return "Alert previewed: " + (ALERT_LABELS[event.detail.alert_type] || event.detail.alert_type);
+    return event.type;
+  }
+
+  function dashboardSection(title) {
+    const section = document.createElement("div");
+    section.className = "dashboard-section";
+    const h3 = document.createElement("h3");
+    h3.textContent = title;
+    section.appendChild(h3);
+    return section;
+  }
+
+  function renderDashboard(data) {
+    const root = document.getElementById("dashboard-content");
+    root.innerHTML = "";
+
+    if (data.risk.fallback && data.risk.fallback.fallback) {
+      const p = document.createElement("p");
+      p.textContent = "We can't give a reliable estimate for this location. " + data.risk.fallback.reason;
+      root.appendChild(p);
+      return;
+    }
+
+    const grid = document.createElement("div");
+    grid.className = "dashboard-grid";
+
+    const riskSection = dashboardSection("Risk");
+    riskSection.appendChild(riskCard(data.risk));
+    grid.appendChild(riskSection);
+
+    const estimateSection = dashboardSection("Restoration estimate");
+    if (data.restoration.reference_effort_hours.value === 0) {
+      const p = document.createElement("p");
+      p.textContent = "Power should be back on per this simulation.";
+      estimateSection.appendChild(p);
+    } else {
+      if (data.previous_estimate && (data.previous_estimate.low_hours !== data.restoration.low_hours.value || data.previous_estimate.high_hours !== data.restoration.high_hours.value)) {
+        const ba = document.createElement("div");
+        ba.className = "before-after";
+        ba.innerHTML = `<span class="before">${data.previous_estimate.low_hours}-${data.previous_estimate.high_hours} h</span><span>→</span><span class="after">${data.restoration.low_hours.value}-${data.restoration.high_hours.value} h</span>`;
+        estimateSection.appendChild(ba);
+      }
+      estimateSection.appendChild(rangeBar(data.restoration.low_hours.value, data.restoration.high_hours.value, 24));
+      const tagRow = document.createElement("div");
+      appendChild(tagRow, evidenceTag(data.restoration.low_hours, "low"));
+      appendChild(tagRow, evidenceTag(data.restoration.high_hours, "high"));
+      estimateSection.appendChild(tagRow);
+    }
+    grid.appendChild(estimateSection);
+    root.appendChild(grid);
+
+    const timelineSection = dashboardSection("Restoration step timeline");
+    const jobs = (data.timeline && data.timeline.jobs) || [];
+    if (!jobs.length) {
+      const p = document.createElement("p");
+      p.className = "empty-lane";
+      p.textContent = "No repair jobs on this path.";
+      timelineSection.appendChild(p);
+    } else {
+      for (const job of jobs) {
+        const row = document.createElement("div");
+        row.className = "timeline-row";
+        const crew = document.createElement("span");
+        crew.className = "crew-badge";
+        crew.textContent = "Crew " + job.crew;
+        row.appendChild(crew);
+        const label = document.createElement("span");
+        label.textContent = job.label.value + " — " + job.duration_hours.value + " h";
+        row.appendChild(label);
+        const status = document.createElement("span");
+        status.className = "status-badge status-" + job.status;
+        status.textContent = job.status.replace("_", " ");
+        row.appendChild(status);
+        timelineSection.appendChild(row);
+      }
+    }
+    root.appendChild(timelineSection);
+
+    const alertsSection = dashboardSection("Alert messages");
+    for (const alert of data.alerts) {
+      const row = document.createElement("div");
+      row.className = "alert-row";
+      const left = document.createElement("div");
+      const name = document.createElement("div");
+      name.className = "alert-name";
+      name.textContent = ALERT_LABELS[alert.type] || alert.type;
+      left.appendChild(name);
+      const timing = document.createElement("div");
+      timing.className = "alert-timing";
+      timing.textContent = alert.timing;
+      left.appendChild(timing);
+      if (alert.triggered) {
+        const msg = document.createElement("div");
+        msg.className = "alert-msg";
+        msg.textContent = alert.message;
+        left.appendChild(msg);
+      }
+      row.appendChild(left);
+      const badge = document.createElement("span");
+      badge.className = alert.triggered ? "triggered-badge" : "not-triggered-badge";
+      badge.textContent = alert.triggered ? "Triggered" : "Not yet";
+      row.appendChild(badge);
+      alertsSection.appendChild(row);
+    }
+    root.appendChild(alertsSection);
+
+    const eventsSection = dashboardSection("Session event feed");
+    if (!data.events.length) {
+      const p = document.createElement("p");
+      p.className = "empty-lane";
+      p.textContent = "No events yet — try a what-if chip.";
+      eventsSection.appendChild(p);
+    } else {
+      for (const event of data.events) {
+        const row = document.createElement("div");
+        row.className = "event-row";
+        const time = document.createElement("time");
+        time.textContent = event.timestamp.slice(11, 19) + " UTC";
+        row.appendChild(time);
+        const span = document.createElement("span");
+        span.textContent = eventText(event);
+        row.appendChild(span);
+        eventsSection.appendChild(row);
+      }
+    }
+    root.appendChild(eventsSection);
+  }
+
+  async function loadDashboard() {
+    if (!sessionId) return;
+    const { body } = await api("/api/dashboard?session_id=" + encodeURIComponent(sessionId));
+    renderDashboard(body);
+  }
+
+  function setView(view) {
+    currentView = view;
+    const askBtn = document.getElementById("view-ask-btn");
+    const dashBtn = document.getElementById("view-dashboard-btn");
+    const dashView = document.getElementById("dashboard-view");
+    if (view === "ask") {
+      conversation.hidden = false;
+      dashView.hidden = true;
+      askBtn.setAttribute("aria-pressed", "true");
+      dashBtn.setAttribute("aria-pressed", "false");
+    } else {
+      conversation.hidden = true;
+      dashView.hidden = false;
+      askBtn.setAttribute("aria-pressed", "false");
+      dashBtn.setAttribute("aria-pressed", "true");
+      loadDashboard();
+    }
+  }
+
+  document.getElementById("view-ask-btn").addEventListener("click", () => setView("ask"));
+  document.getElementById("view-dashboard-btn").addEventListener("click", () => setView("dashboard"));
 
   applyStoredTheme();
   loadHouseholds().then(() => startSession(householdSelect.value));

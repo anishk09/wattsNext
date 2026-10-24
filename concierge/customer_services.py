@@ -3,6 +3,14 @@ customer declares — never to anything inferred about them."""
 
 ESTIMATE_CHANGE_THRESHOLD_HOURS = 2.0
 
+ALERT_TYPES = ["pre_storm", "outage_confirmed", "estimate_updated", "restoration_complete"]
+ALERT_TIMINGS = {
+    "pre_storm": "Sent as soon as a storm watch covers your area.",
+    "outage_confirmed": "Sent once damage is assigned to your upstream path.",
+    "estimate_updated": "Sent when the estimate moves by 2 hours or more.",
+    "restoration_complete": "Sent when repairs on your path are marked complete.",
+}
+
 
 def prep_guidance(household, risk):
     needs = household["declared_needs"]

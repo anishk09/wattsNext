@@ -30,20 +30,61 @@ def _jobs(damage_items):
     jobs = []
     for item in damage_items:
         per_unit_effort = _unit_hours(item) * ILM
-        for _ in range(item["quantity"]):
-            jobs.append(per_unit_effort)
+        for i in range(item["quantity"]):
+            label = item["asset_type"] + (f" #{i + 1}" if item["quantity"] > 1 else "")
+            jobs.append({"asset_type": item["asset_type"], "label": label, "duration": per_unit_effort})
     return jobs
 
 
+def _schedule(jobs, crew_count):
+    """Greedy list scheduling: longest job first onto the least-loaded free crew.
+    Returns one list per crew, each job annotated with its (unrounded) start/end
+    hour — callers round only for display, never before using these for math."""
+    crews = [[] for _ in range(max(crew_count, 1))]
+    loads = [0.0] * max(crew_count, 1)
+    for job in sorted(jobs, key=lambda j: -j["duration"]):
+        i = loads.index(min(loads))
+        start = loads[i]
+        end = start + job["duration"]
+        crews[i].append({**job, "start_hour": start, "end_hour": end})
+        loads[i] = end
+    return crews
+
+
 def _makespan(jobs, crew_count):
-    """Greedy list scheduling: longest job first onto the least-loaded free crew."""
     if not jobs:
         return 0.0
-    loads = [0.0] * max(crew_count, 1)
-    for duration in sorted(jobs, reverse=True):
-        i = loads.index(min(loads))
-        loads[i] += duration
-    return max(loads)
+    crews = _schedule(jobs, crew_count)
+    return max((c[-1]["end_hour"] for c in crews if c), default=0.0)
+
+
+def job_timeline(case, crew_count=1, repairs_complete=False):
+    """Restoration step timeline: one row per job, with its crew and status.
+    The first job scheduled on each crew is 'in_progress' (it's the one the
+    crew would be on right now in this replay); later jobs on that crew are
+    'pending'. This comes straight from the scheduler, not a fabricated clock."""
+    jobs = _jobs(case["damage_items"])
+    crews = _schedule(jobs, crew_count)
+    timeline = []
+    for crew_index, crew_jobs in enumerate(crews, start=1):
+        for position, job in enumerate(crew_jobs):
+            if repairs_complete:
+                status = "complete"
+            elif position == 0:
+                status = "in_progress"
+            else:
+                status = "pending"
+            timeline.append({
+                "crew": crew_index,
+                "asset_type": job["asset_type"],
+                "label": job["label"],
+                "duration_hours": round(job["duration"], 1),
+                "start_hour": round(job["start_hour"], 1),
+                "end_hour": round(job["end_hour"], 1),
+                "status": status,
+            })
+    timeline.sort(key=lambda t: (t["crew"], t["start_hour"]))
+    return timeline
 
 
 def restoration_effort(case, access_blocked=False, extra_crews=0, repairs_complete=False):

@@ -91,6 +91,27 @@ def get_prep_guidance(household_id, repairs_complete=False):
     return {"fallback": {"fallback": False, "reason": None}, "actions": customer_services.prep_guidance(household, risk)}
 
 
+def get_job_timeline(household_id, extra_crews=0, repairs_complete=False):
+    case = cases.case_for_household(household_id)
+    fallback = engine.check_fallback(case)
+    if fallback["fallback"]:
+        return {"fallback": fallback, "jobs": []}
+
+    timeline = engine.job_timeline(case, crew_count=1 + extra_crews, repairs_complete=repairs_complete)
+    return {
+        "fallback": {"fallback": False, "reason": None},
+        "jobs": [
+            {
+                "crew": j["crew"],
+                "label": _tag(j["label"], SOURCE_DATA),
+                "duration_hours": _tag(j["duration_hours"], MODEL_ESTIMATE),
+                "status": j["status"],
+            }
+            for j in timeline
+        ],
+    }
+
+
 def get_alert_info(household_id, access_blocked=False, extra_crews=0, repairs_complete=False, previous_estimate=None):
     household = cases.get_household(household_id)
     case = cases.case_for_household(household_id)
