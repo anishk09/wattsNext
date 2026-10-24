@@ -48,9 +48,14 @@ def classify_intent(message):
         return "alerts"
     if any(k in lowered for k in ("prepare", "get ready", "should i do", "safety")):
         return "prep"
-    if any(k in lowered for k in ("how long", "restoration", "repair", "fix", "back on", "back up")):
+
+    has_restoration = any(k in lowered for k in ("how long", "restoration", "repair", "fix", "back on", "back up"))
+    has_risk = any(k in lowered for k in ("lose power", "risk", "going to lose", "will i"))
+    if has_restoration and has_risk:
+        return "risk_restoration"
+    if has_restoration:
         return "restoration"
-    if any(k in lowered for k in ("lose power", "risk", "going to lose", "will i")):
+    if has_risk:
         return "risk"
     return "overview"
 
@@ -66,9 +71,9 @@ def _offline_answer(intent, household_id, scenario):
             "fallback": True,
         }
 
-    if intent in ("risk", "overview"):
+    if intent in ("risk", "risk_restoration", "overview"):
         cards["risk"] = tools.get_risk(household_id, scenario["repairs_complete"])
-    if intent in ("restoration", "overview"):
+    if intent in ("restoration", "risk_restoration", "overview"):
         cards["restoration"] = tools.get_restoration_estimate(household_id, **scenario)
     if intent in ("prep", "overview"):
         cards["prep"] = tools.get_prep_guidance(household_id, scenario["repairs_complete"])
