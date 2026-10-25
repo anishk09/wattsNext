@@ -4,6 +4,8 @@ connection. Binds to 127.0.0.1 only. No API keys are ever logged or written
 to disk — they live only in the in-memory SETTINGS dict for this process.
 """
 import uuid
+import os
+from pathlib import Path
 from datetime import datetime, timezone
 
 import uvicorn
@@ -13,8 +15,27 @@ from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 
 from concierge import cases, chat, customer_services, gemini, tools
+from backend import data_pipeline, risk_model, audit_log, restoration as restoration_engine, db, weather
 
-SETTINGS = {"api_key": None, "model": None, "offline_mode": False, "last_error": None}
+def _load_env_file():
+    for name in (".env.local", ".env"):
+        path = Path(name)
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if "=" in line and not line.startswith("#"):
+                    key, value = line.split("=", 1)
+                    os.environ.setdefault(key.strip(), value.strip().strip('"'))
+            break
+
+_load_env_file()
+_gemini_key = os.environ.get("GEMINI_API_KEY")
+SETTINGS = {
+    "api_key": _gemini_key,
+    "model": os.environ.get("GEMINI_MODEL", "gemini-2.5-flash") if _gemini_key else None,
+    "provider": "gemini" if _gemini_key else "local",
+    "offline_mode": False,
+    "last_error": None,
+}
 SESSIONS = {}
 
 DEFAULT_SCENARIO = {"access_blocked": False, "extra_crews": 0, "repairs_complete": False}
@@ -96,6 +117,8 @@ async def chat_endpoint(request):
 
     if chat.needs_live_data_refusal(message):
         reply = {"text": chat.OFFICIAL_LINKS_TEXT, "cards": {}, "fallback": False, "offline": False}
+    elif SETTINGS["provider"] == "local":
+        reply = chat.local_reply(message, session["household_id"], session["scenario"])
     elif SETTINGS["offline_mode"] or not SETTINGS["api_key"] or not SETTINGS["model"]:
         reply = chat.offline_reply(message, session["household_id"], session["scenario"])
     else:
@@ -106,11 +129,11 @@ async def chat_endpoint(request):
             )
         except gemini.ProviderError as e:
             SETTINGS["last_error"] = {"category": e.category, "message": e.message}
-            return JSONResponse({
-                "error": "provider_error",
-                "category": e.category,
-                "offer_offline": True,
-            }, status_code=502)
+            # Customer-service continuity: Gemini is optional. If it fails,
+            # render the same deterministic answer through the local model.
+            SETTINGS["provider"] = "local"
+            reply = chat.local_reply(message, session["household_id"], session["scenario"])
+            reply["provider_fallback"] = {"from": "gemini", "category": e.category}
 
     session["history"].append({"role": "user", "parts": [{"text": message}]})
     if reply.get("text"):
@@ -191,6 +214,7 @@ async def dashboard_endpoint(request):
     scenario = session["scenario"]
     risk = tools.get_risk(household_id, scenario["repairs_complete"])
     restoration = tools.get_restoration_estimate(household_id, **scenario)
+    replay_payload = restoration_engine.estimate(cases.case_for_household(household_id), **scenario)
     timeline = tools.get_job_timeline(household_id, extra_crews=scenario["extra_crews"], repairs_complete=scenario["repairs_complete"])
 
     alerts = []
@@ -207,6 +231,8 @@ async def dashboard_endpoint(request):
         "scenario": scenario,
         "risk": risk,
         "restoration": restoration,
+        "monte_carlo": replay_payload["monte_carlo"],
+        "topology": replay_payload["topology"],
         "previous_estimate": session["previous_estimate"],
         "timeline": timeline,
         "alerts": alerts,
@@ -217,6 +243,7 @@ async def dashboard_endpoint(request):
 async def get_settings(request):
     return JSONResponse({
         "model": SETTINGS["model"],
+        "provider": SETTINGS["provider"],
         "offline_mode": SETTINGS["offline_mode"],
         "connected": bool(SETTINGS["model"]) and not SETTINGS["offline_mode"],
         "last_error": SETTINGS["last_error"],
@@ -225,6 +252,12 @@ async def get_settings(request):
 
 async def update_settings(request):
     body = await request.json()
+
+    provider = body.get("provider")
+    if provider in ("local", "gemini"):
+        SETTINGS["provider"] = provider
+        if provider == "local":
+            SETTINGS["offline_mode"] = False
 
     if "offline_mode" in body:
         SETTINGS["offline_mode"] = bool(body["offline_mode"])
@@ -235,6 +268,7 @@ async def update_settings(request):
             model = gemini.pin_model(api_key)
             SETTINGS["api_key"] = api_key
             SETTINGS["model"] = model
+            SETTINGS["provider"] = "gemini"
             SETTINGS["last_error"] = None
             SETTINGS["offline_mode"] = False
         except gemini.ProviderError as e:
@@ -251,6 +285,37 @@ async def update_settings(request):
 async def index(request):
     return FileResponse("static/index.html")
 
+async def data_quality(request):
+    report = data_pipeline.quality_report()
+    report["neon"] = db.table_counts()
+    return JSONResponse(report)
+
+async def model_card(request):
+    return JSONResponse({"name":"Watt'sNext deterministic replay", "intended_use":"customer education and storm replay", "not_intended_for":"live dispatch or SCADA control", "calibration": risk_model.backtest(), "constraints":["no inferred vulnerability", "no utility-confirmed claims", "Gemini cannot alter numbers"]})
+
+async def governance_audit(request):
+    return JSONResponse({"entries": audit_log.read_all()})
+
+async def api_docs(request):
+    return JSONResponse({"openapi":"3.0.0", "info":{"title":"Watt'sNext API","version":"1.0"}, "paths":{
+        "/api/governance/data-quality":{"get":{}}, "/api/governance/model-card":{"get":{}},
+        "/api/governance/audit-log":{"get":{}}, "/api/replay":{"get":{}}, "/api/whatif":{"post":{}}, "/api/chat":{"post":{}}}})
+
+async def database_health(request):
+    return JSONResponse(db.ping())
+
+async def import_readiness(request):
+    return JSONResponse(db.import_readiness())
+
+async def weather_alerts(request):
+    return JSONResponse(weather.active_alerts())
+
+async def replay(request):
+    session = _session_or_404(request.query_params.get("session_id"))
+    if session is None: return JSONResponse({"error":"unknown session_id"}, status_code=404)
+    case = cases.case_for_household(session["household_id"])
+    return JSONResponse(restoration.estimate(case, **session["scenario"]))
+
 
 app = Starlette(routes=[
     Route("/", index),
@@ -262,6 +327,14 @@ app = Starlette(routes=[
     Route("/api/dashboard", dashboard_endpoint),
     Route("/api/settings", get_settings, methods=["GET"]),
     Route("/api/settings", update_settings, methods=["POST"]),
+    Route("/api/governance/data-quality", data_quality),
+    Route("/api/governance/model-card", model_card),
+    Route("/api/governance/audit-log", governance_audit),
+    Route("/api/docs", api_docs),
+    Route("/api/health/database", database_health),
+    Route("/api/governance/import-readiness", import_readiness),
+    Route("/api/weather/alerts", weather_alerts),
+    Route("/api/replay", replay),
     Mount("/static", StaticFiles(directory="static"), name="static"),
 ])
 

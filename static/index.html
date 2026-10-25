@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Watt'sNext</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
   <div class="app">
@@ -71,6 +72,13 @@
       </div>
       <div class="status-line" id="settings-status">Not connected.</div>
       <div>
+        <label for="provider-select">Conversation engine</label>
+        <select id="provider-select">
+          <option value="local">Local LLM</option>
+          <option value="gemini">Gemini API</option>
+        </select>
+      </div>
+      <div>
         <label for="theme-select">Theme</label>
         <select id="theme-select">
           <option value="system">System</option>
@@ -91,5 +99,6 @@
   </template>
 
   <script src="/static/app.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </body>
 </html>

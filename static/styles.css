@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap');
-
 :root {
   /* AEP-site-inspired brand colors (never the AEP/Ohio Power logo or wordmark) */
   --color-primary: #D2352B;      /* red — primary buttons, active states, thin rule */
@@ -42,8 +40,8 @@
   --radius-card: 10px;
   --radius-pill: 4px;
 
-  --font-heading: 'Barlow Condensed', system-ui, sans-serif;
-  --font-body: 'Barlow', system-ui, sans-serif;
+  --font-heading: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
 
   color-scheme: light;
 }
@@ -121,14 +119,15 @@ body {
   line-height: 1.5;
   background: var(--color-background);
   color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 h1, h2, h3, button, .label { font-family: var(--font-heading); }
 
 h1, h2, h3, h4 {
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.02em;
 }
 
 /* Short action labels read like the screenshot's nav/CTA buttons; long
@@ -143,16 +142,16 @@ h1, h2, h3, h4 {
 button {
   cursor: pointer;
   font-size: 15px;
-  border-radius: var(--radius-card);
+  border-radius: 999px;
   border: 1px solid var(--color-border);
   background: var(--color-card);
   color: var(--color-foreground);
   padding: var(--space-1) var(--space-2);
   min-height: 44px;
-  transition: background 200ms, transform 150ms;
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms cubic-bezier(.2,.8,.2,1), box-shadow 180ms ease;
 }
 
-button:hover { background: var(--color-muted); }
+button:hover { background: var(--color-muted); border-color: color-mix(in srgb, var(--color-foreground) 24%, var(--color-border)); }
 button:active { transform: scale(0.98); }
 
 :focus-visible {
@@ -163,7 +162,7 @@ button:active { transform: scale(0.98); }
 a { color: var(--color-link); }
 
 .app {
-  max-width: 760px;
+  max-width: 860px;
   margin: 0 auto;
   min-height: 100vh;
   display: flex;
@@ -174,14 +173,19 @@ a { color: var(--color-link); }
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-2) var(--space-2) var(--space-1);
-  border-bottom: 3px solid var(--color-primary);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 12px var(--space-2);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  box-shadow: 0 8px 24px rgba(0,0,0,.05);
 }
 
 .topbar .brand {
   font-family: var(--font-heading);
   font-weight: 700;
-  font-size: 20px;
+  font-size: 21px;
+  letter-spacing: -0.04em;
   margin-right: auto;
   white-space: nowrap;
   flex-shrink: 0;
@@ -213,10 +217,11 @@ a { color: var(--color-link); }
 .conversation {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-2);
+  padding: clamp(20px, 4vw, 48px) var(--space-2);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  background: color-mix(in srgb, var(--color-panel) 28%, transparent);
 }
 
 .empty-state {
@@ -226,7 +231,8 @@ a { color: var(--color-link); }
 }
 
 .empty-state h1 {
-  font-size: 28px;
+  font-size: clamp(36px, 8vw, 64px);
+  letter-spacing: -0.06em;
   margin: 0 0 var(--space-1);
 }
 
@@ -245,16 +251,19 @@ a { color: var(--color-link); }
 }
 
 .message {
-  max-width: 85%;
-  padding: var(--space-2);
-  border-radius: var(--radius-card);
+  max-width: min(78%, 620px);
+  padding: 12px 16px;
+  border-radius: 22px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.05);
   line-height: 1.5;
+  font-size: 16px;
 }
 
 .message.user {
   align-self: flex-end;
-  background: var(--color-primary);
+  background: linear-gradient(145deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 82%, #7a0d12));
   color: var(--color-on-primary);
+  border-bottom-right-radius: 6px;
 }
 
 .message.assistant {
@@ -262,7 +271,13 @@ a { color: var(--color-link); }
   background: var(--color-card);
   color: var(--color-card-foreground);
   border: 1px solid var(--color-border);
+  border-bottom-left-radius: 6px;
 }
+
+.message p { margin: 0 0 8px; }
+.message p:last-child { margin-bottom: 0; }
+.message.assistant .card { margin-top: 12px; padding: 14px; box-shadow: none; border-radius: 16px; }
+.message.assistant .lanes { gap: 14px; }
 
 .offline-banner {
   font-size: 13px;
@@ -303,9 +318,10 @@ a { color: var(--color-link); }
 .card {
   margin-top: var(--space-2);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border-radius: 20px;
   padding: var(--space-2);
-  background: var(--color-background);
+  background: color-mix(in srgb, var(--color-card) 88%, transparent);
+  box-shadow: 0 10px 30px rgba(0,0,0,.045);
 }
 
 .risk-chip {
@@ -481,6 +497,25 @@ dialog .evidence-kind {
   #new-conversation-btn { padding-left: var(--space-1); padding-right: var(--space-1); min-width: auto; }
 }
 
+/* Calm, physical Apple-style interaction layer. */
+.topbar, .composer {
+  background: color-mix(in srgb, var(--color-background) 84%, transparent);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+.composer { position: sticky; bottom: 0; border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent); }
+.composer input { border-radius: 999px; padding-left: 20px; }
+.starter-questions button { border-radius: 18px; padding: 14px 18px; }
+.view-toggle { border-radius: 999px; padding: 2px; background: color-mix(in srgb, var(--color-muted) 70%, transparent); }
+.view-toggle button { border-radius: 999px; }
+.dashboard-section { border-radius: 22px; box-shadow: 0 10px 30px rgba(0,0,0,.045); }
+.weather-map { height: 360px; border-radius: 18px; overflow: hidden; border: 1px solid var(--color-border); background: var(--color-muted); }
+.weather-disclaimer { font-size: 13px; color: var(--color-muted-foreground); margin: 0 0 12px; }
+.leaflet-container { font-family: var(--font-body); }
+.chips button { background: color-mix(in srgb, var(--color-card) 88%, transparent); }
+@media (prefers-reduced-transparency: reduce) { .topbar, .composer { background: var(--color-background); backdrop-filter: none; } }
+@media (prefers-contrast: more) { .card, .dashboard-section, button, input, select { border-width: 2px; } }
+
 /* View toggle + dashboard */
 .view-toggle {
   display: inline-flex;
@@ -615,6 +650,28 @@ dialog .evidence-kind {
   padding: 6px 0;
   border-bottom: 1px solid var(--color-border);
 }
+
+/* Apple-inspired material and spatial motion: calm, interruptible-feeling feedback
+   without hiding utility-critical status behind decoration. */
+.topbar, .composer {
+  background: color-mix(in srgb, var(--color-background) 84%, transparent);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+.probability-fan { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 18px; }
+.fan-item { padding: 12px; border-radius: 14px; background: var(--color-card); border: 1px solid var(--color-border); display: grid; gap: 4px; }
+.fan-item span { font-size: 12px; color: var(--color-muted-foreground); }
+.fan-item strong { font-family: var(--font-heading); font-size: 20px; letter-spacing: -0.01em; }
+.topology-flow { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.topology-step { min-width: 145px; display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 8px; padding: 10px; border-radius: 14px; background: var(--color-card); border: 1px solid var(--color-border); }
+.topology-step small { grid-column: 2; color: var(--color-muted-foreground); text-transform: capitalize; }
+.topology-node { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--color-primary); color: white; font-weight: 700; }
+button, .card, .dashboard-section { transition: transform 180ms cubic-bezier(.2,.8,.2,1), background-color 180ms ease, border-color 180ms ease; }
+button:active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { button, .card, .dashboard-section { transition: none; } }
+@media (prefers-reduced-transparency: reduce) { .topbar, .composer { background: var(--color-background); backdrop-filter: none; } }
+@media (prefers-contrast: more) { .card, .dashboard-section, button, input, select { border-width: 2px; } }
+@media (max-width: 480px) { .probability-fan { grid-template-columns: 1fr; } .topology-flow { margin-right: -16px; padding-right: 16px; } }
 
 .event-row:last-child { border-bottom: none; }
 .event-row time { color: var(--color-muted-foreground); flex-shrink: 0; font-variant-numeric: tabular-nums; }

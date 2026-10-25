@@ -277,10 +277,50 @@
     return card;
   }
 
-  function renderCards(cards, container) {
-    if (cards.risk) container.appendChild(riskCard(cards.risk));
-    if (cards.restoration || cards.prep) container.appendChild(threeLaneCard(cards.restoration, cards.prep));
-    if (cards.alerts) container.appendChild(alertsCard(cards.alerts));
+  function cardMessage(card) {
+    const message = document.createElement("div");
+    message.className = "message assistant structured-message";
+    message.appendChild(card);
+    conversation.appendChild(message);
+    return message;
+  }
+
+  function estimateMessage(restoration) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.appendChild(laneHeading("Estimate", "clock", "var(--color-icon-blue)"));
+    if (!restoration || restoration.fallback.fallback) {
+      const p = document.createElement("p"); p.className = "empty-lane"; p.textContent = "No reliable estimate is available for this location."; card.appendChild(p);
+    } else if (restoration.reference_effort_hours.value === 0) {
+      const p = document.createElement("p"); p.textContent = "Power should be back on per this simulation."; card.appendChild(p);
+    } else {
+      card.appendChild(rangeBar(restoration.low_hours.value, restoration.high_hours.value, 24));
+      const tags = document.createElement("div"); appendChild(tags, evidenceTag(restoration.low_hours, "low")); appendChild(tags, evidenceTag(restoration.high_hours, "high")); card.appendChild(tags);
+    }
+    return card;
+  }
+
+  function confirmedMessage(restoration) {
+    const card = document.createElement("div"); card.className = "card";
+    card.appendChild(laneHeading("Confirmed by utility", "shield", "var(--color-icon-teal)"));
+    const p = document.createElement("p"); p.className = "empty-lane"; p.textContent = "Nothing is confirmed by the utility in this prototype."; card.appendChild(p);
+    return card;
+  }
+
+  function actionsMessage(prep) {
+    const card = document.createElement("div"); card.className = "card";
+    card.appendChild(laneHeading("What you can do", "checklist", "var(--color-icon-green)"));
+    const actions = (prep && prep.actions) || [];
+    const ul = document.createElement("ul"); actions.forEach(a => { const li = document.createElement("li"); li.textContent = a; ul.appendChild(li); });
+    card.appendChild(ul); return card;
+  }
+
+  function renderCards(cards) {
+    if (cards.risk) cardMessage(riskCard(cards.risk));
+    if (cards.restoration) cardMessage(estimateMessage(cards.restoration));
+    if (cards.restoration || cards.prep) cardMessage(confirmedMessage(cards.restoration));
+    if (cards.prep) cardMessage(actionsMessage(cards.prep));
+    if (cards.alerts) cardMessage(alertsCard(cards.alerts));
   }
 
   function addMessage(role, text, offline, cards) {
@@ -297,7 +337,7 @@
     p.style.margin = "0";
     p.textContent = text;
     msg.appendChild(p);
-    if (cards) renderCards(cards, msg);
+    if (cards) renderCards(cards);
     conversation.appendChild(msg);
     conversation.scrollTop = conversation.scrollHeight;
     return msg;
@@ -393,7 +433,7 @@
     p.textContent = label;
     msg.appendChild(p);
 
-    renderCards({ risk: body.risk, restoration: body.after, prep: body.prep, alerts: body.alerts }, msg);
+    renderCards({ risk: body.risk, restoration: body.after, prep: body.prep, alerts: body.alerts });
     conversation.appendChild(msg);
     conversation.scrollTop = conversation.scrollHeight;
 
@@ -429,6 +469,7 @@
   document.getElementById("settings-btn").addEventListener("click", async () => {
     const { body } = await api("/api/settings");
     document.getElementById("offline-toggle").checked = body.offline_mode;
+    document.getElementById("provider-select").value = body.provider || (body.connected ? "gemini" : "local");
     document.getElementById("settings-status").textContent = body.connected
       ? "Connected — model: " + body.model
       : (body.last_error ? "Last error: " + body.last_error.category : "Not connected.");
@@ -438,7 +479,7 @@
   document.getElementById("settings-save").addEventListener("click", async () => {
     const apiKey = document.getElementById("api-key-input").value;
     const offline = document.getElementById("offline-toggle").checked;
-    const payload = { offline_mode: offline };
+    const payload = { offline_mode: offline, provider: document.getElementById("provider-select").value };
     if (apiKey) payload.api_key = apiKey;
     const { ok, body } = await api("/api/settings", {
       method: "POST",
@@ -517,6 +558,27 @@
     grid.appendChild(estimateSection);
     root.appendChild(grid);
 
+    const simulationSection = dashboardSection("Probability fan & topology", "pulse", "var(--color-icon-blue)");
+    const mc = data.monte_carlo;
+    if (mc) {
+      const fan = document.createElement("div");
+      fan.className = "probability-fan";
+      [ ["P10 optimistic", mc.p10], ["P50 median", mc.p50], ["P90 conservative", mc.p90] ].forEach(([label, value]) => {
+        const item = document.createElement("div"); item.className = "fan-item";
+        item.innerHTML = `<span>${label}</span><strong>${value.toFixed(1)} h</strong>`;
+        fan.appendChild(item);
+      });
+      simulationSection.appendChild(fan);
+    }
+    const topology = document.createElement("div"); topology.className = "topology-flow";
+    (data.topology || []).forEach((node, index) => {
+      const step = document.createElement("div"); step.className = "topology-step";
+      step.innerHTML = `<span class="topology-node">${index + 1}</span><span>${node.stage.replace(/_/g, " ")}</span><small>${node.status.replace(/_/g, " ")}</small>`;
+      topology.appendChild(step);
+    });
+    simulationSection.appendChild(topology);
+    root.appendChild(simulationSection);
+
     const timelineSection = dashboardSection("Restoration step timeline", "list", "var(--color-icon-teal)");
     const jobs = (data.timeline && data.timeline.jobs) || [];
     if (!jobs.length) {
@@ -592,6 +654,28 @@
       }
     }
     root.appendChild(eventsSection);
+    loadWeatherMap(root);
+  }
+
+  async function loadWeatherMap(root) {
+    const section = dashboardSection("Live U.S. weather activity", "warning", "var(--color-icon-orange)");
+    const note = document.createElement("p");
+    note.className = "weather-disclaimer";
+    note.textContent = "Current National Weather Service alerts. This is weather information, not a utility outage or crew-status feed.";
+    section.appendChild(note);
+    const map = document.createElement("div"); map.id = "weather-map"; map.className = "weather-map"; section.appendChild(map); root.appendChild(section);
+    if (!window.L) { map.textContent = "Map library unavailable. Check the NWS alerts source directly."; return; }
+    const leafletMap = L.map(map, { scrollWheelZoom: false }).setView([39.5, -98.5], 4);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors" }).addTo(leafletMap);
+    try {
+      const response = await fetch("/api/weather/alerts");
+      const geo = await response.json();
+      const colors = { Extreme: "#8e24aa", Severe: "#d32f2f", Moderate: "#ef6c00", Minor: "#2e7d32" };
+      L.geoJSON(geo, { style: feature => ({ color: colors[feature.properties.severity] || "#546e7a", fillOpacity: .35, weight: 1 }),
+        onEachFeature: (feature, layer) => layer.bindPopup(`<strong>${feature.properties.event}</strong><br>${feature.properties.area}<br><small>${feature.properties.headline || "Active NWS alert"}</small>`)
+      }).addTo(leafletMap);
+      note.textContent = `${geo.features.length} active NWS weather alert areas. Weather data is separate from Watt'sNext utility replay data.`;
+    } catch (_) { note.textContent = "Weather alerts are temporarily unavailable. Utility replay data remains available."; }
   }
 
   async function loadDashboard() {
