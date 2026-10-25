@@ -74,6 +74,89 @@ class SettingsEndpoint(unittest.TestCase):
         self.assertEqual(resp.status_code, 502)
         self.assertTrue(resp.json()["offer_offline"])
 
+    def test_non_bool_offline_mode_is_rejected(self):
+        client = TestClient(server.app)
+        resp = client.post("/api/settings", json={"offline_mode": "yes"})
+        self.assertEqual(resp.status_code, 400)
+
+
+class InputValidation(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(server.app)
+
+    def test_session_requires_known_household(self):
+        resp = self.client.post("/api/session", json={"household_id": "not-a-real-household"})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_session_rejects_non_string_household_id(self):
+        resp = self.client.post("/api/session", json={"household_id": 123})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_session_rejects_non_object_body(self):
+        resp = self.client.post("/api/session", json=["not", "an", "object"])
+        self.assertEqual(resp.status_code, 400)
+
+    def test_chat_rejects_empty_message(self):
+        resp = self.client.post("/api/session", json={"household_id": "h1"})
+        session_id = resp.json()["session_id"]
+        resp = self.client.post("/api/chat", json={"session_id": session_id, "message": "   "})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_chat_rejects_oversized_message(self):
+        resp = self.client.post("/api/session", json={"household_id": "h1"})
+        session_id = resp.json()["session_id"]
+        resp = self.client.post("/api/chat", json={"session_id": session_id, "message": "x" * 3000})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_whatif_rejects_unknown_action(self):
+        resp = self.client.post("/api/session", json={"household_id": "h1"})
+        session_id = resp.json()["session_id"]
+        resp = self.client.post("/api/whatif", json={"session_id": session_id, "action": "delete_everything"})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_unknown_session_id_is_404_not_500(self):
+        resp = self.client.post("/api/chat", json={"session_id": "nonexistent", "message": "hi"})
+        self.assertEqual(resp.status_code, 404)
+
+
+class AuditLog(unittest.TestCase):
+    def setUp(self):
+        server.SETTINGS["offline_mode"] = True
+        self.client = TestClient(server.app)
+        resp = self.client.post("/api/session", json={"household_id": "h1"})
+        self.session_id = resp.json()["session_id"]
+
+    def test_chat_turn_is_logged_with_required_fields(self):
+        self.client.post("/api/chat", json={"session_id": self.session_id, "message": "Will I lose power?"})
+        resp = self.client.get("/api/audit", params={"session_id": self.session_id})
+        entries = resp.json()["audit_log"]
+        self.assertEqual(len(entries), 1)
+        entry = entries[0]
+        for field in ("timestamp", "turn_type", "inputs", "tools_called", "outputs", "validator", "data_version", "model_name"):
+            self.assertIn(field, entry)
+        self.assertEqual(entry["model_name"], "offline-rules-v1")
+        self.assertTrue(entry["validator"]["valid"])
+        self.assertTrue(any(t["name"] == "get_risk" for t in entry["tools_called"]))
+
+    def test_whatif_turn_is_also_logged(self):
+        self.client.post("/api/whatif", json={"session_id": self.session_id, "action": "block_access"})
+        resp = self.client.get("/api/audit", params={"session_id": self.session_id})
+        entries = resp.json()["audit_log"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["turn_type"], "whatif")
+
+    def test_audit_log_is_newest_first(self):
+        self.client.post("/api/chat", json={"session_id": self.session_id, "message": "Will I lose power?"})
+        self.client.post("/api/whatif", json={"session_id": self.session_id, "action": "block_access"})
+        resp = self.client.get("/api/audit", params={"session_id": self.session_id})
+        entries = resp.json()["audit_log"]
+        self.assertEqual(entries[0]["turn_type"], "whatif")
+        self.assertEqual(entries[1]["turn_type"], "chat")
+
+    def test_unknown_session_is_404(self):
+        resp = self.client.get("/api/audit", params={"session_id": "nonexistent"})
+        self.assertEqual(resp.status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

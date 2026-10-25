@@ -8,7 +8,20 @@ account data never reach a tool call.
 """
 import re
 
-from . import tools, gemini
+from . import tools, gemini, validator
+
+CARD_TO_TOOL = {
+    "risk": "get_risk",
+    "restoration": "get_restoration_estimate",
+    "prep": "get_prep_guidance",
+    "alerts": "get_alert_info",
+}
+
+CORRECTION_INSTRUCTION = (
+    "Your previous answer included at least one number or band word that doesn't appear in the tool "
+    "results above. Restate the answer using ONLY values that appear in those tool results — do not "
+    "introduce any new number, percentage, or band word."
+)
 
 NO_LIVE_DATA_PATTERNS = [
     r"\bshelter\b", r"\bcredit\b", r"\bcompensation\b", r"\brebate\b",
@@ -128,6 +141,11 @@ def offline_reply(message, household_id, scenario):
     intent = classify_intent(message)
     result = _offline_answer(intent, household_id, scenario)
     result["offline"] = True
+    result["tools_called"] = [
+        {"name": CARD_TO_TOOL[key], "args": {"household_id": household_id, **scenario}}
+        for key in result["cards"]
+    ]
+    result["validator"] = validator.validate_reply(result["text"], result["cards"])
     return result
 
 
@@ -136,6 +154,7 @@ def online_reply(api_key, model, message, household_id, scenario, history):
     response = gemini.generate(api_key, model, contents, tools.FUNCTION_DECLARATIONS)
 
     cards = {}
+    tools_called = []
     if response["function_calls"]:
         function_response_parts = []
         for call in response["function_calls"]:
@@ -147,6 +166,7 @@ def online_reply(api_key, model, message, household_id, scenario, history):
                     args[key] = scenario[key]
             result = tools.DISPATCH[name](**args)
             cards[name.replace("get_", "")] = result
+            tools_called.append({"name": name, "args": args})
             function_response_parts.append({
                 "functionResponse": {"name": name, "response": result}
             })
@@ -154,4 +174,36 @@ def online_reply(api_key, model, message, household_id, scenario, history):
         contents.append({"role": "user", "parts": function_response_parts})
         response = gemini.generate(api_key, model, contents, tools.FUNCTION_DECLARATIONS)
 
-    return {"text": response["text"], "cards": cards, "fallback": False, "offline": False}
+    check = validator.validate_reply(response["text"], cards)
+    if not check["valid"]:
+        # One retry: tell the model exactly what it did wrong and ask it
+        # to restate from the same tool results, nothing new.
+        contents.append({"role": "model", "parts": [{"text": response["text"]}]})
+        contents.append({"role": "user", "parts": [{"text": CORRECTION_INSTRUCTION}]})
+        retry_response = gemini.generate(api_key, model, contents, tools.FUNCTION_DECLARATIONS)
+        retry_check = validator.validate_reply(retry_response["text"], cards)
+        if retry_check["valid"]:
+            response, check = retry_response, retry_check
+        else:
+            return {
+                "text": (
+                    "I couldn't produce an answer I could fully verify against the data this time "
+                    f"(unverifiable: {', '.join(retry_check['unverified'])}). Here's what the tools actually found: "
+                    + _render_offline_text(classify_intent(message), cards)
+                ),
+                "cards": cards,
+                "fallback": False,
+                "offline": False,
+                "tools_called": tools_called,
+                "validator": retry_check,
+                "validation_failed": True,
+            }
+
+    return {
+        "text": response["text"],
+        "cards": cards,
+        "fallback": False,
+        "offline": False,
+        "tools_called": tools_called,
+        "validator": check,
+    }
