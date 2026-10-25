@@ -517,6 +517,27 @@
     grid.appendChild(estimateSection);
     root.appendChild(grid);
 
+    const simulationSection = dashboardSection("Probability fan & topology", "pulse", "var(--color-icon-blue)");
+    const mc = data.monte_carlo;
+    if (mc) {
+      const fan = document.createElement("div");
+      fan.className = "probability-fan";
+      [ ["P10 optimistic", mc.p10], ["P50 median", mc.p50], ["P90 conservative", mc.p90] ].forEach(([label, value]) => {
+        const item = document.createElement("div"); item.className = "fan-item";
+        item.innerHTML = `<span>${label}</span><strong>${value.toFixed(1)} h</strong>`;
+        fan.appendChild(item);
+      });
+      simulationSection.appendChild(fan);
+    }
+    const topology = document.createElement("div"); topology.className = "topology-flow";
+    (data.topology || []).forEach((node, index) => {
+      const step = document.createElement("div"); step.className = "topology-step";
+      step.innerHTML = `<span class="topology-node">${index + 1}</span><span>${node.stage.replace(/_/g, " ")}</span><small>${node.status.replace(/_/g, " ")}</small>`;
+      topology.appendChild(step);
+    });
+    simulationSection.appendChild(topology);
+    root.appendChild(simulationSection);
+
     const timelineSection = dashboardSection("Restoration step timeline", "list", "var(--color-icon-teal)");
     const jobs = (data.timeline && data.timeline.jobs) || [];
     if (!jobs.length) {

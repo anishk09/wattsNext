@@ -7,8 +7,10 @@ Safety guard runs first, regardless of mode: questions needing live or
 account data never reach a tool call.
 """
 import re
+import json
 
-from . import tools, gemini
+from . import tools, gemini, local_llm
+from backend.validator import validate
 
 NO_LIVE_DATA_PATTERNS = [
     r"\bshelter\b", r"\bcredit\b", r"\bcompensation\b", r"\brebate\b",
@@ -125,6 +127,35 @@ def offline_reply(message, household_id, scenario):
     result = _offline_answer(intent, household_id, scenario)
     result["offline"] = True
     return result
+
+def local_reply(message, household_id, scenario):
+    """Use OpenLLaMA only as a renderer; Python still owns cards and numbers."""
+    deterministic = offline_reply(message, household_id, scenario)
+    if deterministic.get("fallback"):
+        deterministic["offline"] = True
+        return deterministic
+    prompt = (
+        "You are the local language renderer for Watt'sNext. Rewrite the deterministic answer below "
+        "in empathetic plain English. Do not add, remove, round, or change any number. Do not claim "
+        "live utility data. Keep provenance language and be concise.\nDETERMINISTIC JSON:\n" +
+        json.dumps({"text": deterministic["text"], "cards": deterministic["cards"]}, sort_keys=True)
+    )
+    try:
+        rendered = local_llm.generate(prompt)
+        values = []
+        def collect(value):
+            if isinstance(value, dict):
+                for child in value.values(): collect(child)
+            elif isinstance(value, (int, float)): values.append(value)
+        collect(deterministic["cards"])
+        check = validate(rendered, values)
+        if not check["passed"]:
+            raise local_llm.LocalProviderError("Local output contained an unverified number")
+        return {"text": rendered, "cards": deterministic["cards"], "fallback": False, "offline": False, "local_model": local_llm.MODEL}
+    except local_llm.LocalProviderError:
+        deterministic["offline"] = True
+        deterministic["local_fallback"] = True
+        return deterministic
 
 
 def online_reply(api_key, model, message, household_id, scenario, history):
