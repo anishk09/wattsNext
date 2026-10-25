@@ -321,6 +321,7 @@ a { color: var(--color-link); }
 .risk-Low { background: color-mix(in srgb, var(--color-risk-low) 15%, transparent); color: var(--color-risk-low); }
 .risk-Moderate { background: color-mix(in srgb, var(--color-risk-moderate) 18%, transparent); color: var(--color-risk-moderate); }
 .risk-High { background: color-mix(in srgb, var(--color-risk-high) 15%, transparent); color: var(--color-risk-high); }
+.risk-Unknown { background: var(--color-muted); color: var(--color-muted-foreground); }
 
 .confidence-label {
   font-size: 13px;

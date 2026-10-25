@@ -30,6 +30,7 @@
     shield: '<path d="M12 3 4 6v6c0 5 4 8 8 9 4-1 8-4 8-9V6l-8-3z"/>',
     checklist: '<rect x="4" y="4" width="16" height="16" rx="2"/><polyline points="8,12 10,14 15,9"/>',
     list: '<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+    question: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.6-1.4c.6.9.4 1.8-.4 2.5l-.7.6a2 2 0 0 0-.7 1.5"/><line x1="12" y1="17" x2="12" y2="17.01"/>',
   };
 
   function iconCircle(kind, color, small) {
@@ -41,8 +42,8 @@
     return span;
   }
 
-  const RISK_ICON = { Low: "check", Moderate: "info", High: "warning" };
-  const RISK_COLOR_VAR = { Low: "--color-risk-low", Moderate: "--color-risk-moderate", High: "--color-risk-high" };
+  const RISK_ICON = { Low: "check", Moderate: "info", High: "warning", Unknown: "question" };
+  const RISK_COLOR_VAR = { Low: "--color-risk-low", Moderate: "--color-risk-moderate", High: "--color-risk-high", Unknown: "--color-muted-foreground" };
 
   function applyStoredTheme() {
     try {
@@ -123,7 +124,16 @@
     const card = document.createElement("div");
     card.className = "card";
     if (risk.fallback && risk.fallback.fallback) {
-      card.textContent = "We can't give a reliable estimate for this location. " + risk.fallback.reason;
+      const chipRow = document.createElement("div");
+      const chip = document.createElement("span");
+      chip.className = "risk-chip risk-Unknown";
+      chip.appendChild(iconCircle("question", "var(--color-muted-foreground)", true));
+      chip.appendChild(document.createTextNode("Unknown risk"));
+      chipRow.appendChild(chip);
+      card.appendChild(chipRow);
+      const reason = document.createElement("p");
+      reason.textContent = risk.fallback.reason;
+      card.appendChild(reason);
       return card;
     }
     const chipRow = document.createElement("div");
@@ -534,12 +544,10 @@
     const root = document.getElementById("dashboard-content");
     root.innerHTML = "";
 
-    if (data.risk.fallback && data.risk.fallback.fallback) {
-      const p = document.createElement("p");
-      p.textContent = "We can't give a reliable estimate for this location. " + data.risk.fallback.reason;
-      root.appendChild(p);
-      return;
-    }
+    // Risk can be in fallback (e.g. an ambiguous circuit label) while
+    // restoration/timeline/alerts work fine — they're independent signals.
+    // riskCard() itself renders the "Unknown risk" chip + reason; nothing
+    // here should blank out the rest of the dashboard over it.
 
     const grid = document.createElement("div");
     grid.className = "dashboard-grid";
@@ -549,7 +557,12 @@
     grid.appendChild(riskSection);
 
     const estimateSection = dashboardSection("Restoration estimate", "clock", "var(--color-icon-blue)");
-    if (data.restoration.reference_effort_hours.value === 0) {
+    if (data.restoration.fallback && data.restoration.fallback.fallback) {
+      const p = document.createElement("p");
+      p.className = "empty-lane";
+      p.textContent = data.restoration.fallback.reason;
+      estimateSection.appendChild(p);
+    } else if (data.restoration.reference_effort_hours.value === 0) {
       const p = document.createElement("p");
       p.textContent = "Power should be back on per this simulation.";
       estimateSection.appendChild(p);

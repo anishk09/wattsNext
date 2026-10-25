@@ -161,7 +161,7 @@ def online_reply(api_key, model, message, household_id, scenario, history):
             name = call["name"]
             args = dict(call.get("args", {}))
             args.setdefault("household_id", household_id)
-            for key in ("access_blocked", "extra_crews", "repairs_complete"):
+            for key in tools.TOOL_SCENARIO_KEYS.get(name, ()):
                 if key in scenario and key not in args:
                     args[key] = scenario[key]
             result = tools.DISPATCH[name](**args)
@@ -170,7 +170,11 @@ def online_reply(api_key, model, message, household_id, scenario, history):
             function_response_parts.append({
                 "functionResponse": {"name": name, "response": result}
             })
-        contents.append({"role": "model", "parts": [{"functionCall": c} for c in response["function_calls"]]})
+        # Reuse the model's raw parts list, not a reconstruction from
+        # function_calls alone — Gemini attaches a thoughtSignature
+        # alongside a functionCall part, and it must round-trip unchanged
+        # for the model to keep its reasoning context on the next turn.
+        contents.append({"role": "model", "parts": response["parts"]})
         contents.append({"role": "user", "parts": function_response_parts})
         response = gemini.generate(api_key, model, contents, tools.FUNCTION_DECLARATIONS)
 
@@ -178,7 +182,7 @@ def online_reply(api_key, model, message, household_id, scenario, history):
     if not check["valid"]:
         # One retry: tell the model exactly what it did wrong and ask it
         # to restate from the same tool results, nothing new.
-        contents.append({"role": "model", "parts": [{"text": response["text"]}]})
+        contents.append({"role": "model", "parts": response["parts"]})
         contents.append({"role": "user", "parts": [{"text": CORRECTION_INSTRUCTION}]})
         retry_response = gemini.generate(api_key, model, contents, tools.FUNCTION_DECLARATIONS)
         retry_check = validator.validate_reply(retry_response["text"], cards)

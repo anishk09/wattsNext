@@ -224,3 +224,13 @@ DISPATCH = {
     "get_prep_guidance": get_prep_guidance,
     "get_alert_info": get_alert_info,
 }
+
+# Which session-scenario keys each tool actually accepts — get_risk and
+# get_prep_guidance don't take access_blocked/extra_crews, so the online
+# chat loop must not blindly forward every scenario key to every tool call.
+TOOL_SCENARIO_KEYS = {
+    "get_risk": ("repairs_complete",),
+    "get_restoration_estimate": ("access_blocked", "extra_crews", "repairs_complete"),
+    "get_prep_guidance": ("repairs_complete",),
+    "get_alert_info": ("access_blocked", "extra_crews", "repairs_complete"),
+}

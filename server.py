@@ -183,9 +183,9 @@ async def chat_endpoint(request):
 
     if chat.needs_live_data_refusal(message):
         reply = {"text": chat.OFFICIAL_LINKS_TEXT, "cards": {}, "fallback": False, "offline": False, "tools_called": [], "validator": {"valid": True, "unverified": []}}
-    elif SETTINGS["offline_mode"] or not SETTINGS["api_key"] or not SETTINGS["model"]:
+    elif SETTINGS["offline_mode"]:
         reply = chat.offline_reply(message, session["household_id"], session["scenario"])
-    else:
+    elif SETTINGS["api_key"] and SETTINGS["model"]:
         try:
             reply = chat.online_reply(
                 SETTINGS["api_key"], SETTINGS["model"], message,
@@ -196,8 +196,23 @@ async def chat_endpoint(request):
             return JSONResponse({
                 "error": "provider_error",
                 "category": e.category,
+                "message": e.message,
                 "offer_offline": True,
             }, status_code=502)
+    elif SETTINGS["last_error"]:
+        # A connection was attempted (at startup via .env, or manually) and
+        # failed — never silently drop to offline over that; make the user
+        # choose, same as a failure mid-conversation would.
+        return JSONResponse({
+            "error": "provider_error",
+            "category": SETTINGS["last_error"]["category"],
+            "message": SETTINGS["last_error"]["message"],
+            "offer_offline": True,
+        }, status_code=502)
+    else:
+        # No key anywhere, nothing ever attempted — offline is the honest
+        # base state here, not a fallback from a failure.
+        reply = chat.offline_reply(message, session["household_id"], session["scenario"])
 
     clean_text, privacy_violations = privacy.scrub(reply.get("text"))
     reply["text"] = clean_text

@@ -229,10 +229,19 @@ unchanged — same labor-workbook math as before.
   to tool output), not *correctness* of the underlying model — it can't
   catch a tool itself computing something wrong, only the model
   inventing something the tools never said.
-- No live Gemini call has been exercised in this environment (no network
-  access during development); the online path is implemented against the
-  documented REST API shape but unverified end-to-end. Offline mode
-  (fully tested) is the demo-safe fallback.
+- The online path has been exercised against a real key: `gemini-2.5-flash`
+  (the original default) 404s ("no longer available to new users") despite
+  being listed by list-models — `gemini-flash-latest` is now the only
+  allowlisted model, pinned via a real tool-call round trip. A full
+  question-to-answer live run hasn't been confirmed end-to-end yet — at
+  verification time `gemini-flash-latest` itself was returning a real,
+  repeated `503 "experiencing high demand"` from Google's side (confirmed
+  via direct curl against the API, independent of this app's code) — but
+  the failure path is: no server crash (a raw socket timeout used to
+  propagate uncaught and crash the startup lifespan — fixed), honest
+  `model_unavailable`/`unavailable` categorization with the real message,
+  and no silent drop to offline mode. Offline mode (fully tested) remains
+  the demo-safe path regardless of Google's service state.
 - Never implemented, on purpose: live weather/outage/crew-position data,
   shelter status, compensation/credit eligibility, or any inference of
   health information.

@@ -20,6 +20,12 @@ PATTERNS = {
     # digits, e.g. -80.2125770318). 7+ digits keeps this well clear of our
     # own rate figures, which are rounded to 6 decimal places at most.
     "coordinate": re.compile(r"-?\d{1,3}\.\d{7,}"),
+    # Internal substation/circuit labels (e.g. STATION29, CIR6) used
+    # throughout cases.json and the risk-model join — never meant to reach
+    # a customer. Backstop: the real fix is templates that never embed
+    # them (see engine.py RISK_FALLBACK_REASONS); this catches any other
+    # path that might.
+    "internal_grid_label": re.compile(r"\bSTATION\d+\b|\bCIR\d+\b", re.IGNORECASE),
 }
 
 FACILITY_KEYWORDS = re.compile(

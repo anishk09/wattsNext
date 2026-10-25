@@ -121,6 +121,49 @@ class InputValidation(unittest.TestCase):
         self.assertEqual(resp.status_code, 404)
 
 
+class NoSilentOfflineFallback(unittest.TestCase):
+    """A failed connection attempt (startup .env, or a manual key) must
+    never silently drop to offline mode — the customer gets the same
+    honest-error-plus-offer-offline response as a failure mid-chat."""
+
+    def setUp(self):
+        self.client = TestClient(server.app)
+        resp = self.client.post("/api/session", json={"household_id": "h1"})
+        self.session_id = resp.json()["session_id"]
+
+    def tearDown(self):
+        server.SETTINGS.update({"api_key": None, "model": None, "offline_mode": False, "last_error": None, "key_source": None})
+
+    def test_failed_connection_surfaces_honest_error_not_silent_offline(self):
+        server.SETTINGS["offline_mode"] = False
+        server.SETTINGS["api_key"] = None
+        server.SETTINGS["model"] = None
+        server.SETTINGS["last_error"] = {"category": "model_unavailable", "message": "gemini-flash-latest is no longer available to new users"}
+
+        resp = self.client.post("/api/chat", json={"session_id": self.session_id, "message": "Will I lose power?"})
+        self.assertEqual(resp.status_code, 502)
+        body = resp.json()
+        self.assertTrue(body["offer_offline"])
+        self.assertEqual(body["category"], "model_unavailable")
+        self.assertIn("no longer available", body["message"])
+
+    def test_explicit_offline_mode_still_works_normally(self):
+        server.SETTINGS["offline_mode"] = True
+        server.SETTINGS["last_error"] = {"category": "model_unavailable", "message": "irrelevant, offline was chosen"}
+        resp = self.client.post("/api/chat", json={"session_id": self.session_id, "message": "Will I lose power?"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["offline"])
+
+    def test_never_attempted_no_key_anywhere_is_a_normal_offline_answer(self):
+        server.SETTINGS["offline_mode"] = False
+        server.SETTINGS["api_key"] = None
+        server.SETTINGS["model"] = None
+        server.SETTINGS["last_error"] = None
+        resp = self.client.post("/api/chat", json={"session_id": self.session_id, "message": "Will I lose power?"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["offline"])
+
+
 class EnvAutoConnect(unittest.TestCase):
     """_connect_from_env() is only ever wired to real server startup via the
     lifespan context manager (confirmed separately: a bare TestClient(app),
@@ -138,10 +181,10 @@ class EnvAutoConnect(unittest.TestCase):
 
     def test_valid_key_connects_and_sets_env_key_source(self):
         with mock.patch("concierge.env_config.get_gemini_api_key", return_value="fake-key"), \
-             mock.patch("server.gemini.pin_model", return_value="gemini-2.5-flash"):
+             mock.patch("server.gemini.pin_model", return_value="gemini-flash-latest"):
             server._connect_from_env()
         self.assertEqual(server.SETTINGS["key_source"], "env")
-        self.assertEqual(server.SETTINGS["model"], "gemini-2.5-flash")
+        self.assertEqual(server.SETTINGS["model"], "gemini-flash-latest")
         self.assertEqual(server.SETTINGS["api_key"], "fake-key")
         self.assertFalse(server.SETTINGS["offline_mode"])
 
@@ -155,7 +198,7 @@ class EnvAutoConnect(unittest.TestCase):
 
     def test_settings_endpoint_reports_env_source_without_the_key(self):
         with mock.patch("concierge.env_config.get_gemini_api_key", return_value="fake-key"), \
-             mock.patch("server.gemini.pin_model", return_value="gemini-2.5-flash"):
+             mock.patch("server.gemini.pin_model", return_value="gemini-flash-latest"):
             server._connect_from_env()
         client = TestClient(server.app)
         resp = client.get("/api/settings")

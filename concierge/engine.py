@@ -28,14 +28,16 @@ STORM_MULTIPLIER = _risk_model["storm_multiplier"]
 BAND_THRESHOLDS = _risk_model["overall"]["band_thresholds"]
 
 RISK_FALLBACK_REASONS = {
+    # Customer-facing — never names an internal station/circuit label.
+    # The technical detail (which pair, which candidate IDs) is still
+    # available to a developer via GET /api/data-quality.
     "ambiguous_circuit_label": (
-        "This circuit's damage history can't be reliably computed — source records for {station}/{circuit} "
-        "map ambiguously to more than one circuit ID in the underlying GIS asset tables, so we can't trust "
-        "a population-level rate for it."
+        "This household's circuit maps ambiguously to more than one record in the underlying grid "
+        "data, so we can't trust a population-level damage rate for it."
     ),
     "unmapped_circuit_label": (
-        "This circuit's damage history can't be reliably computed — {station}/{circuit} doesn't appear in "
-        "any of the asset tables used to build the historical rate model."
+        "This household's circuit doesn't appear in the asset data used to build the historical rate "
+        "model, so we can't compute a damage rate for it."
     ),
     "no_path": "This household has no validated upstream path.",
 }
@@ -254,7 +256,7 @@ def check_risk_fallback(case):
     status = case.get("risk_status")
     if status and status != "ok":
         template = RISK_FALLBACK_REASONS.get(status, "Historical risk data is not available for this circuit.")
-        return {"fallback": True, "reason": template.format(station=case.get("substation"), circuit=case.get("circuit"))}
+        return {"fallback": True, "reason": template}
     if case.get("circuit_id") not in _risk_model["circuits"]:
         return {"fallback": True, "reason": "No exposure data is available for this circuit."}
     return {"fallback": False, "reason": None}
