@@ -31,6 +31,26 @@ Before editing anything, run `git init && git add -A && git commit -m "baseline"
 
 ## Calculation rules (must match; these are acceptance tests)
 
+> **Superseded by the backend overhaul below** (judges weighted backend over
+> frontend; full writeup in `MODEL_CARD.md`). Kept here as the historical
+> brief this project started from — the rules that changed:
+> - Risk band: no longer "unrepaired damage present ⇒ High." Now an
+>   exposure-normalized historical damage rate per circuit, empirical-Bayes
+>   shrunk toward the system-wide rate, storm setting scales it as a stated
+>   assumption. Confidence now comes from effective sample size, not a fixed
+>   Medium/Low split, and has its own fallback condition separate from the
+>   path-validity one (`engine.check_risk_fallback`).
+> - Restoration range: no longer a flat 75%–150% multiply. Now a seeded
+>   Monte Carlo simulation (P10/P50/P90) over labor-hour and crew-availability
+>   distributions, filtered by step restoration (only damage between the
+>   household and its nearest closed upstream protective device counts).
+> - The transformer-case acceptance numbers below are the *original* ones;
+>   `tests/test_engine.py::TransformerAcceptanceRanges` documents the new
+>   P10/P50/P90 values and exactly how they relate to these.
+>
+> Everything else on this page (architecture, hard rules, UI, phases) still
+> applies — only the calculation methods changed.
+
 - **Restoration effort** = reference install + removal hours × quantity × **4.5 indirect multiplier**. Do **not** add drive/setup/safety time again (the 4.5 already includes it).
 - Treat workbook hours as **crew-hours** (stated assumption, shown in UI). One crew per job; independent jobs run in parallel when crews are free; supply returns only when *all* repairs on the household's path finish. Extra crews never split one job.
 - Range = **75%–150%** of reference effort, labeled "scenario range, not a confidence interval".
@@ -99,6 +119,13 @@ Before editing anything, run `git init && git add -A && git commit -m "baseline"
 - Never put API keys in files, logs, or commits. Keys go in the Settings field only.
 
 ## Demo acceptance walkthrough (run before 7:45)
+
+> Numbers below are the *original* fixed-band figures. Post-overhaul, step 1
+> expects **High risk, High confidence** (effective sample size, not the old
+> fixed Medium) and restoration **P10/P50/P90 8.1/10.8/14.0 h** (not 6.7–13.5 h);
+> step 3 expects **11.1/13.7/17.1 h** (not 9.7–16.5 h), still Low confidence.
+> See `MODEL_CARD.md` for why the shape changed. The walkthrough's shape
+> (what each step demonstrates) is otherwise unchanged.
 
 1. Pick Roanoke, transformer case. Household A has a power bank and needs a phone for work. Ask "Will I lose power and for how long?" Expect High, Medium confidence, 6.7–13.5 h, and evidence tags.
 2. Switch to household B with a declared power-dependent medical device. Ask the same question. Expect the same range but different priorities: a provider-approved backup plan, phone-call escalation, and no promise that a generic battery can power the device.
