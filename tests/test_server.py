@@ -158,5 +158,26 @@ class AuditLog(unittest.TestCase):
         self.assertEqual(resp.status_code, 404)
 
 
+class VisibilityEndpoints(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(server.app)
+
+    def test_data_quality_reports_join_exclusions_and_the_bogus_repair_date_finding(self):
+        resp = self.client.get("/api/data-quality")
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertGreater(body["circuit_crosswalk"]["ambiguous_pair_count"], 0)
+        self.assertGreater(body["damage_join"]["unmapped"], 0)
+        self.assertEqual(body["unrepaired_with_repair_date"]["count"], body["unrepaired_with_repair_date"]["of_unrepaired_total"])
+        self.assertIn("spearman_rank_correlation", body["backtest_summary"])
+
+    def test_docs_page_lists_every_real_route(self):
+        resp = self.client.get("/docs")
+        self.assertEqual(resp.status_code, 200)
+        text = resp.text
+        for path in ("/api/chat", "/api/whatif", "/api/audit", "/api/dashboard", "/api/data-quality", "/api/session", "/api/settings"):
+            self.assertIn(path, text)
+
+
 if __name__ == "__main__":
     unittest.main()

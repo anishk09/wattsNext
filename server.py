@@ -3,16 +3,20 @@ Watt'sNext server: routes, in-memory sessions, chat orchestration, provider
 connection. Binds to 127.0.0.1 only. No API keys are ever logged or written
 to disk — they live only in the in-memory SETTINGS dict for this process.
 """
+import json
+import pathlib
 import uuid
 from datetime import datetime, timezone
 
 import uvicorn
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse, FileResponse
+from starlette.responses import JSONResponse, FileResponse, HTMLResponse
 from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 
-from concierge import cases, chat, customer_services, data_version, gemini, privacy, tools, validator
+from concierge import api_docs, cases, chat, customer_services, data_version, gemini, privacy, tools, validator
+
+DATA_DIR = pathlib.Path(__file__).parent / "data"
 
 SETTINGS = {"api_key": None, "model": None, "offline_mode": False, "last_error": None}
 SESSIONS = {}
@@ -343,6 +347,21 @@ async def update_settings(request):
     return await get_settings(request)
 
 
+async def data_quality_endpoint(request):
+    dq = json.loads((DATA_DIR / "data_quality.json").read_text())
+    backtest = json.loads((DATA_DIR / "backtest.json").read_text())
+    dq["backtest_summary"] = {
+        "spearman_rank_correlation": backtest["spearman_rank_correlation"],
+        "interpretation": backtest["interpretation"],
+    }
+    dq["data_version"] = data_version.VERSION
+    return JSONResponse(dq)
+
+
+async def docs_endpoint(request):
+    return HTMLResponse(api_docs.render_html())
+
+
 async def index(request):
     return FileResponse("static/index.html")
 
@@ -358,6 +377,8 @@ app = Starlette(routes=[
     Route("/api/dashboard", dashboard_endpoint),
     Route("/api/settings", get_settings, methods=["GET"]),
     Route("/api/settings", update_settings, methods=["POST"]),
+    Route("/api/data-quality", data_quality_endpoint),
+    Route("/docs", docs_endpoint),
     Mount("/static", StaticFiles(directory="static"), name="static"),
 ])
 
