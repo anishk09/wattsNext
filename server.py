@@ -4,6 +4,8 @@ connection. Binds to 127.0.0.1 only. No API keys are ever logged or written
 to disk — they live only in the in-memory SETTINGS dict for this process.
 """
 import uuid
+import os
+from pathlib import Path
 from datetime import datetime, timezone
 
 import uvicorn
@@ -13,9 +15,27 @@ from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 
 from concierge import cases, chat, customer_services, gemini, tools
-from backend import data_pipeline, risk_model, audit_log, restoration as restoration_engine, db
+from backend import data_pipeline, risk_model, audit_log, restoration as restoration_engine, db, weather
 
-SETTINGS = {"api_key": None, "model": None, "provider": "local", "offline_mode": False, "last_error": None}
+def _load_env_file():
+    for name in (".env.local", ".env"):
+        path = Path(name)
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if "=" in line and not line.startswith("#"):
+                    key, value = line.split("=", 1)
+                    os.environ.setdefault(key.strip(), value.strip().strip('"'))
+            break
+
+_load_env_file()
+_gemini_key = os.environ.get("GEMINI_API_KEY")
+SETTINGS = {
+    "api_key": _gemini_key,
+    "model": os.environ.get("GEMINI_MODEL", "gemini-2.5-flash") if _gemini_key else None,
+    "provider": "gemini" if _gemini_key else "local",
+    "offline_mode": False,
+    "last_error": None,
+}
 SESSIONS = {}
 
 DEFAULT_SCENARIO = {"access_blocked": False, "extra_crews": 0, "repairs_complete": False}
@@ -109,11 +129,11 @@ async def chat_endpoint(request):
             )
         except gemini.ProviderError as e:
             SETTINGS["last_error"] = {"category": e.category, "message": e.message}
-            return JSONResponse({
-                "error": "provider_error",
-                "category": e.category,
-                "offer_offline": True,
-            }, status_code=502)
+            # Customer-service continuity: Gemini is optional. If it fails,
+            # render the same deterministic answer through the local model.
+            SETTINGS["provider"] = "local"
+            reply = chat.local_reply(message, session["household_id"], session["scenario"])
+            reply["provider_fallback"] = {"from": "gemini", "category": e.category}
 
     session["history"].append({"role": "user", "parts": [{"text": message}]})
     if reply.get("text"):
@@ -233,6 +253,12 @@ async def get_settings(request):
 async def update_settings(request):
     body = await request.json()
 
+    provider = body.get("provider")
+    if provider in ("local", "gemini"):
+        SETTINGS["provider"] = provider
+        if provider == "local":
+            SETTINGS["offline_mode"] = False
+
     if "offline_mode" in body:
         SETTINGS["offline_mode"] = bool(body["offline_mode"])
 
@@ -281,6 +307,9 @@ async def database_health(request):
 async def import_readiness(request):
     return JSONResponse(db.import_readiness())
 
+async def weather_alerts(request):
+    return JSONResponse(weather.active_alerts())
+
 async def replay(request):
     session = _session_or_404(request.query_params.get("session_id"))
     if session is None: return JSONResponse({"error":"unknown session_id"}, status_code=404)
@@ -304,6 +333,7 @@ app = Starlette(routes=[
     Route("/api/docs", api_docs),
     Route("/api/health/database", database_health),
     Route("/api/governance/import-readiness", import_readiness),
+    Route("/api/weather/alerts", weather_alerts),
     Route("/api/replay", replay),
     Mount("/static", StaticFiles(directory="static"), name="static"),
 ])

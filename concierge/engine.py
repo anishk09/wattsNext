@@ -16,10 +16,15 @@ CATEGORIES = _labor["categories"]
 
 
 def _unit_hours(item):
-    cat = CATEGORIES[item["asset_type"]]
+    cat = CATEGORIES.get(item["asset_type"])
+    if cat is None:
+        # Imported Neon asset classes can be more granular than the local
+        # workbook. Keep the estimate deterministic and visibly conservative
+        # until a matching labor reference is curated.
+        return 2.0
     if "sizes" in cat:
         key = str(item.get("size_kva") or item.get("size_group"))
-        size = cat["sizes"][key]
+        size = cat["sizes"].get(key) or next(iter(cat["sizes"].values()))
     else:
         size = cat
     return size["install_hours"] + size["removal_hours"]

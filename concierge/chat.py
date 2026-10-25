@@ -61,6 +61,22 @@ def classify_intent(message):
         return "risk"
     return "overview"
 
+def is_greeting(message):
+    cleaned = re.sub(r"[^a-z ]", "", message.lower()).strip()
+    return cleaned in {"hi", "hello", "hey", "hiya", "good morning", "good afternoon", "good evening", "thanks", "thank you"}
+
+def small_talk_reply(message):
+    cleaned = re.sub(r"[^a-z ]", "", message.lower()).strip()
+    if cleaned in {"thanks", "thank you"}:
+        return "You’re welcome. If you need anything else, I can help with outage risk, restoration timing, preparation, or alerts."
+    if cleaned in {"good morning", "good afternoon", "good evening"}:
+        return "Hello — I’m Watt’sNext. How can I help with your power service today?"
+    if cleaned in {"who are you", "what are you", "what can you do", "help", "can you help me"}:
+        return "I’m Watt’sNext, a storm-outage customer service assistant. I can explain the replayed risk for your selected household, show a restoration range, help you prepare, and explain alert eligibility. I don’t have live outage, weather, crew, shelter, or account data."
+    if cleaned in {"bye", "goodbye", "see you", "thats all", "that's all"}:
+        return "Take care. If the power goes out, stay away from downed lines and use the official Appalachian Power outage center for live status."
+    return None
+
 
 def _offline_answer(intent, household_id, scenario):
     cards = {}
@@ -110,7 +126,7 @@ def _render_offline_text(intent, cards):
             safety = [a for a in all_actions if a.startswith("SAFETY:")]
             other = [a for a in all_actions if not a.startswith("SAFETY:")]
             shown = safety + other[: max(1, 3 - len(safety))]
-        parts.append("What you can do: " + "; ".join(shown) + ".")
+        parts.append("What you can do: " + "; ".join(a.rstrip(".") for a in shown) + ".")
     if "alerts" in cards:
         a = cards["alerts"]
         if a["eligible"]:
@@ -123,6 +139,9 @@ def _render_offline_text(intent, cards):
 
 
 def offline_reply(message, household_id, scenario):
+    talk = small_talk_reply(message)
+    if talk or is_greeting(message):
+        return {"text": talk or "Hi — I’m Watt’sNext. I can help you understand outage risk, estimate a restoration range, prepare for a storm, or check your alert eligibility. What would you like to know?", "cards": {}, "fallback": False, "offline": True}
     intent = classify_intent(message)
     result = _offline_answer(intent, household_id, scenario)
     result["offline"] = True
@@ -131,6 +150,8 @@ def offline_reply(message, household_id, scenario):
 def local_reply(message, household_id, scenario):
     """Use OpenLLaMA only as a renderer; Python still owns cards and numbers."""
     deterministic = offline_reply(message, household_id, scenario)
+    if small_talk_reply(message) or is_greeting(message):
+        return deterministic
     if deterministic.get("fallback"):
         deterministic["offline"] = True
         return deterministic
@@ -149,7 +170,13 @@ def local_reply(message, household_id, scenario):
             elif isinstance(value, (int, float)): values.append(value)
         collect(deterministic["cards"])
         check = validate(rendered, values)
-        if not check["passed"]:
+        lowered = rendered.lower()
+        quality_fail = (
+            len(rendered.split()) < 12 or len(rendered) > 1800 or
+            "here's the rewritten" in lowered or "deterministic json" in lowered or
+            "as an ai" in lowered or "i cannot" in lowered
+        )
+        if not check["passed"] or quality_fail:
             raise local_llm.LocalProviderError("Local output contained an unverified number")
         return {"text": rendered, "cards": deterministic["cards"], "fallback": False, "offline": False, "local_model": local_llm.MODEL}
     except local_llm.LocalProviderError:
@@ -160,7 +187,7 @@ def local_reply(message, household_id, scenario):
 
 def online_reply(api_key, model, message, household_id, scenario, history):
     contents = list(history) + [{"role": "user", "parts": [{"text": message}]}]
-    response = gemini.generate(api_key, model, contents, tools.FUNCTION_DECLARATIONS)
+    response = gemini.generate(api_key, model, contents, tools.FUNCTION_DECLARATIONS, SYSTEM_INSTRUCTION)
 
     cards = {}
     if response["function_calls"]:
@@ -179,6 +206,6 @@ def online_reply(api_key, model, message, household_id, scenario, history):
             })
         contents.append({"role": "model", "parts": [{"functionCall": c} for c in response["function_calls"]]})
         contents.append({"role": "user", "parts": function_response_parts})
-        response = gemini.generate(api_key, model, contents, tools.FUNCTION_DECLARATIONS)
+        response = gemini.generate(api_key, model, contents, tools.FUNCTION_DECLARATIONS, SYSTEM_INSTRUCTION)
 
     return {"text": response["text"], "cards": cards, "fallback": False, "offline": False}

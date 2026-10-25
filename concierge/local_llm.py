@@ -7,8 +7,8 @@ MODEL = os.environ.get("OPENLLAMA_MODEL", "openllama")
 class LocalProviderError(Exception):
     pass
 
-def generate(prompt, timeout=30):
-    body = {"model": MODEL, "stream": False, "messages": [{"role": "user", "content": prompt}]}
+def generate(prompt, timeout=8):
+    body = {"model": MODEL, "stream": False, "options": {"temperature": 0.15, "num_predict": 220}, "messages": [{"role": "user", "content": prompt}]}
     req = urllib.request.Request(BASE_URL.rstrip("/") + "/api/chat", data=json.dumps(body).encode(), method="POST", headers={"Content-Type":"application/json"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as response:

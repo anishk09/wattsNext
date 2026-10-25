@@ -93,12 +93,12 @@ def main():
 
             for r in rows("households.csv"):
                 cur.execute("""
-                    insert into households (external_id, display_name, city, declared_needs, alert_opt_in, alert_channel)
-                    values (%s, %s, %s, %s, %s, %s)
+                    insert into households (external_id, display_name, city, case_key, declared_needs, alert_opt_in, alert_channel)
+                    values (%s, %s, %s, %s, %s, %s, %s)
                     on conflict (external_id) do update set display_name=excluded.display_name,
-                      city=excluded.city, declared_needs=excluded.declared_needs,
+                      city=excluded.city, case_key=excluded.case_key, declared_needs=excluded.declared_needs,
                       alert_opt_in=excluded.alert_opt_in, alert_channel=excluded.alert_channel
-                """, (r["external_id"], r["display_name"], r["city"], json_value(r["declared_needs"]),
+                """, (r["external_id"], r["display_name"], r["city"], r["case_key"], json_value(r["declared_needs"]),
                       r["alert_opt_in"].lower() == "true", null(r["alert_channel"])))
 
             for r in rows("labor_references.csv"):

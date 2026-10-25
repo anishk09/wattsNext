@@ -79,11 +79,13 @@ def pin_model(api_key):
     raise ProviderError("unavailable", "No allowlisted model completed a tool-call round trip.")
 
 
-def generate(api_key, model, contents, function_declarations):
+def generate(api_key, model, contents, function_declarations, system_instruction=None):
     body = {
         "contents": contents,
         "tools": [{"function_declarations": function_declarations}],
     }
+    if system_instruction:
+        body["systemInstruction"] = {"parts": [{"text": system_instruction}]}
     result = _request(f"models/{model}:generateContent", api_key, method="POST", body=body)
     candidates = result.get("candidates", [])
     if not candidates:
