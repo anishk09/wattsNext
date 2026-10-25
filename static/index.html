@@ -62,7 +62,8 @@
   <dialog id="settings-dialog">
     <h2>Settings</h2>
     <div class="settings-grid">
-      <div>
+      <div id="env-key-note" class="status-line" hidden>Key loaded from .env</div>
+      <div id="api-key-field">
         <label for="api-key-input">Gemini API key</label>
         <input id="api-key-input" type="password" placeholder="Paste your key">
       </div>

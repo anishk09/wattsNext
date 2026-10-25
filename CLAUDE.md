@@ -2,6 +2,13 @@
 
 Deadline: **8:00 p.m. Eastern today.** Working demo > extra features. Stop adding scope at 7:15.
 
+## Git workflow (persistent rule)
+
+Commit and push only to the **`dev`** branch. Never commit or push to
+`main` or `prod1.0` unless the user explicitly asks for that branch by
+name in that request. This applies regardless of which branch happens to
+be checked out — switch to `dev` first if needed.
+
 Product name is **Watt'sNext** (spelled exactly like that: capital W, apostrophe, capital N, no space). It replaces the old working name "Lumen". Rename every user-visible "Lumen" string. Tagline: *"Know what's next when the power goes out."*
 
 ## What we're building

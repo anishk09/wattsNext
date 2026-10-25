@@ -1,8 +1,10 @@
 import unittest
+from unittest import mock
 
 from starlette.testclient import TestClient
 
 import server
+from concierge import gemini
 
 
 class ChatFlow(unittest.TestCase):
@@ -117,6 +119,50 @@ class InputValidation(unittest.TestCase):
     def test_unknown_session_id_is_404_not_500(self):
         resp = self.client.post("/api/chat", json={"session_id": "nonexistent", "message": "hi"})
         self.assertEqual(resp.status_code, 404)
+
+
+class EnvAutoConnect(unittest.TestCase):
+    """_connect_from_env() is only ever wired to real server startup via the
+    lifespan context manager (confirmed separately: a bare TestClient(app),
+    as used everywhere else in this file, never drives it) — these tests
+    call it directly, with the network call mocked, to check its own logic."""
+
+    def tearDown(self):
+        server.SETTINGS.update({"api_key": None, "model": None, "offline_mode": False, "last_error": None, "key_source": None})
+
+    def test_no_key_leaves_settings_untouched(self):
+        with mock.patch("concierge.env_config.get_gemini_api_key", return_value=None):
+            server._connect_from_env()
+        self.assertIsNone(server.SETTINGS["key_source"])
+        self.assertIsNone(server.SETTINGS["model"])
+
+    def test_valid_key_connects_and_sets_env_key_source(self):
+        with mock.patch("concierge.env_config.get_gemini_api_key", return_value="fake-key"), \
+             mock.patch("server.gemini.pin_model", return_value="gemini-2.5-flash"):
+            server._connect_from_env()
+        self.assertEqual(server.SETTINGS["key_source"], "env")
+        self.assertEqual(server.SETTINGS["model"], "gemini-2.5-flash")
+        self.assertEqual(server.SETTINGS["api_key"], "fake-key")
+        self.assertFalse(server.SETTINGS["offline_mode"])
+
+    def test_invalid_key_falls_back_without_crashing(self):
+        with mock.patch("concierge.env_config.get_gemini_api_key", return_value="bad-key"), \
+             mock.patch("server.gemini.pin_model", side_effect=gemini.ProviderError("permission", "bad key")):
+            server._connect_from_env()
+        self.assertIsNone(server.SETTINGS["key_source"])
+        self.assertIsNone(server.SETTINGS["model"])
+        self.assertEqual(server.SETTINGS["last_error"]["category"], "permission")
+
+    def test_settings_endpoint_reports_env_source_without_the_key(self):
+        with mock.patch("concierge.env_config.get_gemini_api_key", return_value="fake-key"), \
+             mock.patch("server.gemini.pin_model", return_value="gemini-2.5-flash"):
+            server._connect_from_env()
+        client = TestClient(server.app)
+        resp = client.get("/api/settings")
+        body = resp.json()
+        self.assertEqual(body["key_source"], "env")
+        self.assertNotIn("api_key", body)
+        self.assertNotIn("fake-key", resp.text)
 
 
 class AuditLog(unittest.TestCase):

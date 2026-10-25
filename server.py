@@ -6,6 +6,7 @@ to disk — they live only in the in-memory SETTINGS dict for this process.
 import json
 import pathlib
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import uvicorn
@@ -14,14 +15,43 @@ from starlette.responses import JSONResponse, FileResponse, HTMLResponse
 from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 
-from concierge import api_docs, cases, chat, customer_services, data_version, gemini, privacy, tools, validator
+from concierge import api_docs, cases, chat, customer_services, data_version, env_config, gemini, privacy, tools, validator
 
 DATA_DIR = pathlib.Path(__file__).parent / "data"
 
-SETTINGS = {"api_key": None, "model": None, "offline_mode": False, "last_error": None}
+# key_source: None (no key yet) | "env" (.env/shell, never shown or editable
+# from Settings) | "manual" (typed into the Settings field this session).
+SETTINGS = {"api_key": None, "model": None, "offline_mode": False, "last_error": None, "key_source": None}
 SESSIONS = {}
 
 DEFAULT_SCENARIO = {"access_blocked": False, "extra_crews": 0, "repairs_complete": False}
+
+
+def _connect_from_env():
+    """Startup-time auto-connect. Never logs the key itself — only the
+    resulting model name or an honest error category."""
+    key = env_config.get_gemini_api_key()
+    if not key:
+        return
+    try:
+        model = gemini.pin_model(key)
+        SETTINGS["api_key"] = key
+        SETTINGS["model"] = model
+        SETTINGS["key_source"] = "env"
+        SETTINGS["offline_mode"] = False
+        print(f"[startup] Connected to Gemini via .env/environment key — model: {model}")
+    except gemini.ProviderError as e:
+        SETTINGS["last_error"] = {"category": e.category, "message": e.message}
+        print(f"[startup] GEMINI_API_KEY found but connection failed ({e.category}); falling back to Settings/offline mode.")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    # Tied to actual server startup (uvicorn's lifespan protocol), not mere
+    # module import — a bare TestClient() (no `with`) never drives this, so
+    # the test suite stays network-free regardless of a local .env.
+    _connect_from_env()
+    yield
 
 MAX_MESSAGE_LENGTH = 2000
 
@@ -313,6 +343,7 @@ async def get_settings(request):
         "offline_mode": SETTINGS["offline_mode"],
         "connected": bool(SETTINGS["model"]) and not SETTINGS["offline_mode"],
         "last_error": SETTINGS["last_error"],
+        "key_source": SETTINGS["key_source"],
     })
 
 
@@ -334,6 +365,7 @@ async def update_settings(request):
             model = gemini.pin_model(api_key)
             SETTINGS["api_key"] = api_key
             SETTINGS["model"] = model
+            SETTINGS["key_source"] = "manual"
             SETTINGS["last_error"] = None
             SETTINGS["offline_mode"] = False
         except gemini.ProviderError as e:
@@ -380,7 +412,7 @@ app = Starlette(routes=[
     Route("/api/data-quality", data_quality_endpoint),
     Route("/docs", docs_endpoint),
     Mount("/static", StaticFiles(directory="static"), name="static"),
-])
+], lifespan=lifespan)
 
 
 if __name__ == "__main__":

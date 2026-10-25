@@ -20,15 +20,26 @@ model and why.
 
 ```bash
 pip install -r requirements.txt
+cp .env.example .env   # then put your Gemini key in .env
 python3 server.py
 # open http://127.0.0.1:8000
 ```
 
-Add your Gemini API key in Settings (gear icon) to enable the AI
-conversation, or turn on "Offline explanation mode" to run entirely on
-deterministic templates — no key needed. The app binds to 127.0.0.1 only;
-the key is held in memory for the process and is never written to disk or
-logged.
+**API key, in order of priority:**
+1. `GEMINI_API_KEY` in the shell environment.
+2. `GEMINI_API_KEY` in a `.env` file in the project root (copy
+   `.env.example`, which ships with an empty key — `.env` itself is
+   gitignored and was never committed).
+3. Neither present → the Settings dialog (gear icon) accepts a key, or
+   "Offline explanation mode" runs entirely on deterministic templates,
+   no key needed at all.
+
+If a key is found via (1) or (2), the server connects automatically on
+startup — no need to open Settings before chatting. Settings then shows
+"Key loaded from .env — model: &lt;name&gt;" instead of an editable key
+field; the key itself is never displayed, logged, or returned by any API
+response. The app binds to 127.0.0.1 only; the key lives in memory for
+the process only.
 
 To regenerate `data/*.json` from the raw AEP package (only needed if the
 source package in `aep-data/` changes):
@@ -58,6 +69,7 @@ concierge/
   validator.py               Answer validator: every number/band must trace to tool output
   privacy.py                 Redacts premise/equipment IDs, coordinates, facility keywords
   data_version.py            Sha256 fingerprint of data/ for the audit log
+  env_config.py               Reads GEMINI_API_KEY from the shell env or .env (stdlib, no python-dotenv)
   api_docs.py                Renders GET /docs
 data/
   labor_reference.json      Install/removal hours by category, ILM, sourced from the AEP workbook

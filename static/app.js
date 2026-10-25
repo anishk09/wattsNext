@@ -461,12 +461,27 @@
   });
 
   const settingsDialog = document.getElementById("settings-dialog");
-  document.getElementById("settings-btn").addEventListener("click", async () => {
-    const { body } = await api("/api/settings");
+
+  function applySettingsToDialog(body) {
     document.getElementById("offline-toggle").checked = body.offline_mode;
+    const envNote = document.getElementById("env-key-note");
+    const apiKeyField = document.getElementById("api-key-field");
+    if (body.key_source === "env") {
+      envNote.textContent = "Key loaded from .env — model: " + body.model;
+      envNote.hidden = false;
+      apiKeyField.hidden = true;
+    } else {
+      envNote.hidden = true;
+      apiKeyField.hidden = false;
+    }
     document.getElementById("settings-status").textContent = body.connected
       ? "Connected — model: " + body.model
       : (body.last_error ? "Last error: " + body.last_error.category : "Not connected.");
+  }
+
+  document.getElementById("settings-btn").addEventListener("click", async () => {
+    const { body } = await api("/api/settings");
+    applySettingsToDialog(body);
     settingsDialog.showModal();
   });
   document.getElementById("settings-close").addEventListener("click", () => settingsDialog.close());
@@ -481,9 +496,11 @@
       body: JSON.stringify(payload),
     });
     document.getElementById("api-key-input").value = "";
-    document.getElementById("settings-status").textContent = ok
-      ? (body.connected ? "Connected — model: " + body.model : "Offline mode is on.")
-      : "Connection failed (" + body.category + "). Offline mode is available.";
+    if (ok) {
+      applySettingsToDialog(body);
+    } else {
+      document.getElementById("settings-status").textContent = "Connection failed (" + body.category + "). Offline mode is available.";
+    }
   });
 
   document.getElementById("theme-select").addEventListener("change", (e) => setTheme(e.target.value));
