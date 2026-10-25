@@ -121,3 +121,32 @@ browser — only city names and circuit-level damage summaries.
   health information — all explicitly out of scope per the brief's hard
   rules. These questions get an honest "I don't have that" answer pointing
   to the official Appalachian Power and Red Cross sites.
+
+## Deploying to Vercel
+
+The repository includes `vercel.json` and `api/index.py` for Vercel's Python
+runtime. Import the repository into Vercel, then configure these environment
+variables in the Vercel project settings:
+
+- `DATABASE_URL` — pooled Neon connection string
+- `DATABASE_URL_UNPOOLED` — direct Neon connection string for migrations only
+- `NEON_BRANCH` — production branch identifier
+- `GEMINI_API_KEY` — optional server-side Gemini key
+- `GEMINI_MODEL` — optional model override, default `gemini-2.5-flash`
+- `WATTSNEXT_USE_NEON=true`
+
+Do not commit `.env.local` or API keys. Run migrations before the first
+production deployment with `python scripts/migrate.py` using the direct Neon
+URL. Vercel handles the Python function; it does not run the Dockerfile.
+
+## Docker deployment
+
+Build and run the included container with:
+
+```bash
+docker compose up --build
+```
+
+The container listens on port 8000 and uses `.env.local` only for local
+development. For hosted Docker, inject secrets through the platform's secret
+manager instead.
