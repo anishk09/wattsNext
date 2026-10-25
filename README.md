@@ -150,3 +150,16 @@ docker compose up --build
 The container listens on port 8000 and uses `.env.local` only for local
 development. For hosted Docker, inject secrets through the platform's secret
 manager instead.
+
+## CI/CD release process
+
+Every pull request runs repository secret checks, Python compilation and
+tests, JavaScript/build validation, migration-file checks, and a production
+Docker smoke test. Dependabot keeps Python packages, npm packages, and GitHub
+Actions current.
+
+Production deployment is intentionally tag-gated. After the `production`
+GitHub environment approval, pushing a tag such as `v1.0.0` deploys through
+Vercel when `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` are set as
+repository or environment secrets. Neon migrations should be run separately
+against the direct production connection before the deployment is approved.
